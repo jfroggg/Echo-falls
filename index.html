@@ -1,0 +1,3223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Echo Falls: Autumn Isles</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js 3D Engine CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100dvh;
+            overflow: hidden;
+            background-color: #131f24;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Landscape Orientation Overlay */
+        #orientation-warning {
+            display: none;
+        }
+        @media (orientation: portrait) and (max-width: 820px) {
+            #orientation-warning {
+                display: flex;
+            }
+        }
+
+        /* Glassmorphic UI Panels */
+        .glass-panel {
+            background: rgba(38, 26, 18, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 2px solid rgba(245, 185, 118, 0.45);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Responsive Action Buttons */
+        .btn-bouncy {
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.15s;
+        }
+        .btn-bouncy:active {
+            transform: scale(0.88);
+        }
+
+        /* Virtual Joystick */
+        #joystick-base {
+            width: 110px;
+            height: 110px;
+            background: rgba(255, 255, 255, 0.22);
+            border: 3px solid rgba(255, 255, 255, 0.55);
+            border-radius: 50%;
+            position: relative;
+            backdrop-filter: blur(4px);
+        }
+        #joystick-thumb {
+            width: 46px;
+            height: 46px;
+            background: linear-gradient(135deg, #f39c12, #d35400);
+            border: 2.5px solid #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 32px;
+            left: 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+
+        /* Polaroid Camera Frame Overlay */
+        #polaroid-frame {
+            border: 18px solid #fdfbf7;
+            border-bottom: 54px solid #fdfbf7;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+
+        /* Flash FX */
+        #camera-flash {
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+        }
+
+        /* Title Screen Overlay Glow */
+        .title-glow {
+            text-shadow: 0 0 20px rgba(245, 185, 118, 0.6), 0 4px 12px rgba(0,0,0,0.8);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(245, 185, 118, 0.5);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="select-none overflow-hidden">
+
+    <!-- GAME CANVAS -->
+    <canvas id="game-canvas" tabindex="1"></canvas>
+
+    <!-- TITLE SCREEN OVERLAY -->
+    <div id="title-screen" class="absolute inset-0 z-40 flex flex-col items-center justify-between p-6 sm:p-10 pointer-events-auto bg-gradient-to-b from-black/40 via-transparent to-black/60 transition-opacity duration-700">
+        <!-- Top Title Badge -->
+        <div class="flex flex-col items-center text-center mt-4 sm:mt-8">
+            <div class="glass-panel text-amber-200 text-[10px] sm:text-xs font-black tracking-widest uppercase px-4 py-1.5 rounded-full mb-3 border border-amber-400/50 shadow-xl">
+                🍁 AN AUTUMN ANGLING & BOATING VOYAGE
+            </div>
+            <h1 id="main-title-text" class="text-3xl sm:text-5xl md:text-6xl font-black text-amber-100 tracking-tight title-glow max-w-2xl leading-none">
+                ECHO FALLS
+            </h1>
+            <p id="main-subtitle-text" class="text-amber-300 font-bold text-sm sm:text-lg mt-2 tracking-wide drop-shadow">
+                Autumn Isles & River Archipelago
+            </p>
+        </div>
+
+        <!-- Start Game & Title Name Selector Box -->
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full flex flex-col items-center text-center shadow-2xl border-2 border-amber-400/60 mb-4 sm:mb-8">
+            <button id="btn-start-game" class="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-amber-950 font-black text-base sm:text-lg py-4 px-8 rounded-2xl btn-bouncy shadow-2xl border-2 border-white flex items-center justify-center space-x-3 mb-4">
+                <span class="text-xl">⛵</span>
+                <span>START VOYAGE</span>
+                <span class="text-xs bg-amber-950/30 text-amber-900 px-2 py-0.5 rounded-lg ml-2 font-mono">[SPACE]</span>
+            </button>
+
+            <!-- Title Name Pitch Picker -->
+            <div class="w-full bg-amber-950/60 p-3 rounded-2xl border border-amber-500/30 text-left">
+                <label class="text-[10px] font-extrabold text-amber-300 uppercase tracking-wider block mb-1.5 flex justify-between">
+                    <span>Title Name Idea Picker</span>
+                    <span class="text-amber-400">10 Pitches</span>
+                </label>
+                <select id="title-name-select" onchange="changeTitleName(this.value)" class="w-full bg-amber-900/90 text-amber-100 text-xs font-bold p-2.5 rounded-xl border border-amber-400/40 focus:outline-none">
+                    <option value="Echo Falls: Autumn Isles">1. Echo Falls: Autumn Isles (Selected)</option>
+                    <option value="Echo Falls Haven">2. Echo Falls Haven</option>
+                    <option value="Whispering River: Echo Falls">3. Whispering River: Echo Falls</option>
+                    <option value="Echo Falls Drift">4. Echo Falls Drift</option>
+                    <option value="Tales from Echo Falls">5. Tales from Echo Falls</option>
+                    <option value="Cozy Currents: Echo Archipelago">6. Cozy Currents: Echo Archipelago</option>
+                    <option value="Golden Shoals: Echo Reach">7. Golden Shoals: Echo Reach</option>
+                    <option value="Maple Reach Angler">8. Maple Reach Angler</option>
+                    <option value="Riverdrift: Leaves & Lures">9. Riverdrift: Leaves & Lures</option>
+                    <option value="The Whispering Channels">10. The Whispering Channels</option>
+                </select>
+            </div>
+
+            <!-- Controls Summary -->
+            <div class="grid grid-cols-3 gap-2 w-full mt-3 text-[10px] font-bold text-amber-200/90">
+                <div class="bg-amber-950/40 p-2 rounded-xl border border-amber-500/20">🕹️ WASD / Joy</div>
+                <div class="bg-amber-950/40 p-2 rounded-xl border border-amber-500/20">🎣 F Cast / Space Reel</div>
+                <div class="bg-amber-950/40 p-2 rounded-xl border border-amber-500/20">⛏️ G Dig / E Boat</div>
+            </div>
+        </div>
+
+        <!-- Footer Info -->
+        <div class="text-[10px] text-amber-200/70 font-semibold tracking-wider">
+            TAP TO START • EXPLORE 14 RIVER ISLES • JOURNEY TO ECHO FALLS
+        </div>
+    </div>
+
+    <!-- TOP HUD BAR -->
+    <div id="hud-top" class="absolute top-3 left-3 right-3 flex justify-between items-center pointer-events-none z-20">
+        <!-- Title & Location Banner -->
+        <div class="flex items-center space-x-2">
+            <div class="glass-panel text-amber-100 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl flex items-center space-x-2 sm:space-x-3 pointer-events-auto shadow-lg">
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-500/30 flex items-center justify-center text-amber-300 font-bold text-sm sm:text-base">⛵</div>
+                <div>
+                    <h1 id="hud-game-title" class="font-extrabold text-[11px] sm:text-xs tracking-wide text-amber-200 leading-none">Echo Falls</h1>
+                    <p id="location-text" class="text-[9px] sm:text-[10px] text-amber-300/90 font-semibold leading-tight mt-0.5">Oakwood Haven Pier</p>
+                </div>
+            </div>
+
+            <!-- BOAT TRACKER ARROW WIDGET -->
+            <div id="boat-arrow-widget" class="glass-panel text-amber-100 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl flex items-center space-x-2 pointer-events-auto shadow-lg bg-amber-950/80 border-amber-400/60">
+                <div id="boat-arrow-icon" class="text-base sm:text-xl transition-transform duration-75 origin-center inline-block text-amber-300">⬆️</div>
+                <div>
+                    <div class="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300 font-extrabold leading-none">Boat Tracker</div>
+                    <div id="compass-dist" class="text-[10px] sm:text-xs font-black text-amber-100 leading-none mt-0.5">3.5m</div>
+                </div>
+            </div>
+
+            <!-- TIME OF DAY BADGE -->
+            <div id="time-badge" class="glass-panel text-amber-100 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl flex items-center space-x-1.5 pointer-events-auto shadow-lg bg-amber-950/70 border-amber-400/40 hidden md:flex">
+                <span id="time-icon" class="text-xs sm:text-sm">🌅</span>
+                <span id="time-text" class="text-[10px] sm:text-xs font-bold text-amber-200">Golden Hour</span>
+            </div>
+        </div>
+
+        <!-- Scoreboard & Wallet & Utility Actions -->
+        <div class="flex items-center space-x-1.5 sm:space-x-2 pointer-events-auto">
+            <div class="glass-panel text-amber-100 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl flex items-center space-x-1.5 sm:space-x-2">
+                <span class="text-sm sm:text-base">💰</span>
+                <div>
+                    <div class="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300 font-bold">Coins</div>
+                    <div id="coins-text" class="text-xs sm:text-sm font-black text-amber-100 leading-none">40G</div>
+                </div>
+            </div>
+
+            <div class="glass-panel text-amber-100 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl flex items-center space-x-1.5 sm:space-x-2">
+                <span class="text-sm sm:text-base">🐟</span>
+                <div>
+                    <div class="text-[8px] sm:text-[9px] uppercase tracking-wider text-amber-300 font-bold">Derby</div>
+                    <div id="score-text" class="text-xs sm:text-sm font-black text-amber-100 leading-none">0 pts</div>
+                </div>
+            </div>
+
+            <!-- Consolidated Angler Tools Button -->
+            <button id="btn-tools-hub" class="glass-panel px-3 py-2 sm:px-3.5 sm:py-2 rounded-2xl text-amber-200 hover:bg-amber-800/40 btn-bouncy pointer-events-auto text-xs sm:text-sm font-black flex items-center space-x-1.5 border-amber-400/60" title="Angler Tools & Apparel">
+                <span>⚙️</span> <span class="hidden sm:inline">MENU</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- CONSOLIDATED ANGLER TOOLS MENU MODAL -->
+    <div id="tools-modal" class="hidden absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-40 p-4">
+        <div class="glass-panel p-5 sm:p-6 rounded-3xl max-w-sm w-full flex flex-col text-amber-100 shadow-2xl border-2 border-amber-400">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-amber-500/30">
+                <h2 class="font-black text-base sm:text-lg text-amber-200 flex items-center space-x-2">
+                    <span>⚙️</span> <span>Angler Menu Hub</span>
+                </h2>
+                <button id="btn-tools-close" class="text-amber-300 font-bold hover:text-white text-xl">✕</button>
+            </div>
+
+            <div class="space-y-2.5">
+                <button onclick="openPhotoMode()" class="w-full bg-amber-950/80 hover:bg-amber-900 text-amber-100 font-bold p-3 rounded-2xl btn-bouncy border border-amber-500/40 flex items-center justify-between text-xs sm:text-sm">
+                    <span class="flex items-center space-x-2"><span>📷</span> <span>Polaroid Viewfinder</span></span>
+                    <span class="text-amber-400 text-[10px]">SNAPSHOT</span>
+                </button>
+                <button onclick="openCustomizerModal()" class="w-full bg-amber-950/80 hover:bg-amber-900 text-amber-100 font-bold p-3 rounded-2xl btn-bouncy border border-amber-500/40 flex items-center justify-between text-xs sm:text-sm">
+                    <span class="flex items-center space-x-2"><span>👔</span> <span>Apparel & Motorboat Finish</span></span>
+                    <span class="text-amber-400 text-[10px]">CUSTOMIZE</span>
+                </button>
+                <button onclick="openJournalModal()" class="w-full bg-amber-950/80 hover:bg-amber-900 text-amber-100 font-bold p-3 rounded-2xl btn-bouncy border border-amber-500/40 flex items-center justify-between text-xs sm:text-sm">
+                    <span class="flex items-center space-x-2"><span>📖</span> <span>Angler Journal & Album</span></span>
+                    <span class="text-amber-400 text-[10px]">RECORDS</span>
+                </button>
+                <button id="btn-toggle-sound" class="w-full bg-amber-950/80 hover:bg-amber-900 text-amber-100 font-bold p-3 rounded-2xl btn-bouncy border border-amber-500/40 flex items-center justify-between text-xs sm:text-sm">
+                    <span class="flex items-center space-x-2"><span>🎵</span> <span id="sound-label">Toggle Soundtrack & SFX</span></span>
+                    <span class="text-amber-400 text-[10px]">AUDIO</span>
+                </button>
+                <button id="btn-toggle-fs" class="w-full bg-amber-950/80 hover:bg-amber-900 text-amber-100 font-bold p-3 rounded-2xl btn-bouncy border border-amber-500/40 flex items-center justify-between text-xs sm:text-sm">
+                    <span class="flex items-center space-x-2"><span>⛶</span> <span>Fullscreen Mode</span></span>
+                    <span class="text-amber-400 text-[10px]">VIEW</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOUCH & CONTROLS HUD -->
+    <div id="touch-hud" class="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none z-20 pb-[env(safe-area-inset-bottom)]">
+        <!-- Virtual Joystick -->
+        <div id="joystick-container" class="pointer-events-auto touch-none">
+            <div id="joystick-base">
+                <div id="joystick-thumb"></div>
+            </div>
+        </div>
+
+        <!-- Touch Buttons Group -->
+        <div class="flex space-x-2 sm:space-x-3 pointer-events-auto">
+            <button id="btn-interact" class="glass-panel bg-amber-600/90 hover:bg-amber-500 text-white font-bold py-2 px-3 sm:py-3 sm:px-4 rounded-2xl text-xs sm:text-sm flex flex-col items-center btn-bouncy border-amber-300/50 shadow-lg">
+                <span class="text-base sm:text-lg">🖐️</span>
+                <span id="interact-label">INTERACT / BOAT</span>
+                <span class="text-[9px] text-amber-200 opacity-80">(Key E)</span>
+            </button>
+
+            <button id="btn-dig" class="glass-panel bg-yellow-700/90 hover:bg-yellow-600 text-white font-bold py-2 px-3 sm:py-3 sm:px-4 rounded-2xl text-xs sm:text-sm flex flex-col items-center btn-bouncy border-yellow-400/50 shadow-lg">
+                <span class="text-base sm:text-lg">⛏️</span>
+                <span>DIG 'X' SPOT</span>
+                <span class="text-[9px] text-yellow-200 opacity-80">(Key G)</span>
+            </button>
+
+            <button id="btn-cast" class="glass-panel bg-orange-600/90 hover:bg-orange-500 text-white font-bold py-2 px-3 sm:py-3 sm:px-4 rounded-2xl text-xs sm:text-sm flex flex-col items-center btn-bouncy border-orange-300/50 shadow-lg">
+                <span class="text-base sm:text-lg">🎣</span>
+                <span id="cast-label">CAST ROD</span>
+                <span class="text-[9px] text-orange-200 opacity-80">(Key F)</span>
+            </button>
+
+            <button id="btn-reel" class="hidden glass-panel bg-emerald-600/90 hover:bg-emerald-500 text-white font-extrabold py-3 px-6 sm:py-4 sm:px-7 rounded-2xl text-xs sm:text-sm flex flex-col items-center btn-bouncy border-emerald-300/50 shadow-xl animate-pulse">
+                <span class="text-xl sm:text-2xl">⚡</span>
+                <span>REEL IN!</span>
+                <span class="text-[9px] text-emerald-100 opacity-80">(HOLD SPACE)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- POLAROID PHOTO MODE OVERLAY -->
+    <div id="photo-overlay" class="hidden absolute inset-0 z-30 pointer-events-auto flex flex-col items-center justify-between p-6 bg-black/40 backdrop-blur-xs">
+        <div class="text-amber-100 font-black text-sm tracking-widest bg-amber-950/80 px-4 py-2 rounded-full border border-amber-400/50 shadow-xl">
+            📷 POLAROID VIEW FINDER
+        </div>
+
+        <div id="polaroid-frame" class="relative w-[85%] max-w-md aspect-4/3 rounded-lg overflow-hidden flex items-center justify-center pointer-events-none">
+            <div class="absolute inset-0 border-2 border-dashed border-white/40"></div>
+            <div class="text-white/60 font-mono text-xs absolute bottom-2 right-3">ECHO FALLS '26</div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <button id="btn-take-photo" class="bg-gradient-to-r from-amber-500 to-orange-500 text-amber-950 font-black text-sm px-6 py-3 rounded-2xl btn-bouncy shadow-2xl border-2 border-white flex items-center space-x-2">
+                <span>📸</span> <span>SNAP SNAPSHOT</span>
+            </button>
+            <button id="btn-close-photo" class="bg-amber-900/90 text-amber-200 font-bold text-sm px-5 py-3 rounded-2xl btn-bouncy border border-amber-400/40">
+                EXIT [ESC]
+            </button>
+        </div>
+    </div>
+
+    <!-- CAMERA FLASH FX -->
+    <div id="camera-flash" class="fixed inset-0 bg-white z-50 pointer-events-none"></div>
+
+    <!-- DIALOGUE MODAL -->
+    <div id="dialogue-box" class="hidden absolute bottom-20 left-1/2 -translate-x-1/2 w-[92%] max-w-xl glass-panel p-4 sm:p-5 rounded-3xl z-30 pointer-events-auto shadow-2xl">
+        <div class="flex items-start space-x-3 sm:space-x-4">
+            <div id="npc-avatar" class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-500/30 flex items-center justify-center text-2xl sm:text-3xl border-2 border-amber-300/40 flex-shrink-0">🐱</div>
+            <div class="flex-1">
+                <div id="npc-name" class="font-black text-amber-300 text-xs sm:text-sm tracking-wide uppercase">Cousin Pip</div>
+                <div id="npc-text" class="text-amber-100 text-xs sm:text-sm mt-1 leading-relaxed font-medium">Ahoy! Hop into our boat tied at the pier deck and let's explore upriver to Echo Falls!</div>
+            </div>
+        </div>
+        <div class="text-right mt-3 flex justify-end space-x-2">
+            <button id="btn-dialogue-shop" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-4 py-2 rounded-xl btn-bouncy shadow">
+                Open Tackle Shop 🛒
+            </button>
+            <button id="btn-dialogue-close" class="bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs px-4 py-2 rounded-xl btn-bouncy shadow">
+                Continue [E]
+            </button>
+        </div>
+    </div>
+
+    <!-- APPAREL & BOAT CUSTOMIZER MODAL -->
+    <div id="custom-modal" class="hidden absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-40 p-4">
+        <div class="glass-panel p-5 sm:p-6 rounded-3xl max-w-lg w-full max-h-[85dvh] flex flex-col text-amber-100">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-amber-500/30">
+                <h2 class="font-black text-base sm:text-lg text-amber-200 flex items-center space-x-2">
+                    <span>👔</span> <span>Angler Customizer & Apparel</span>
+                </h2>
+                <button id="btn-custom-close" class="text-amber-300 font-bold hover:text-white text-xl">✕</button>
+            </div>
+
+            <div class="space-y-4 overflow-y-auto pr-1 flex-1">
+                <!-- Scarf Color -->
+                <div>
+                    <label class="text-xs font-bold text-amber-300 block mb-2">Scarf Color</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="setScarfColor(0x9b2c2c)" class="p-2.5 rounded-xl bg-red-800 border border-red-400 font-bold text-xs btn-bouncy">Ruby Red</button>
+                        <button onclick="setScarfColor(0xd69e2e)" class="p-2.5 rounded-xl bg-amber-600 border border-amber-300 font-bold text-xs btn-bouncy">Autumn Gold</button>
+                        <button onclick="setScarfColor(0x2f855a)" class="p-2.5 rounded-xl bg-emerald-800 border border-emerald-400 font-bold text-xs btn-bouncy">Forest Green</button>
+                        <button onclick="setScarfColor(0x2b6cb0)" class="p-2.5 rounded-xl bg-blue-800 border border-blue-400 font-bold text-xs btn-bouncy">Deep Navy</button>
+                    </div>
+                </div>
+
+                <!-- Headwear -->
+                <div>
+                    <label class="text-xs font-bold text-amber-300 block mb-2">Cozy Headwear</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setHat('none')" class="p-3 rounded-xl bg-amber-950/80 border border-amber-500/40 font-bold text-xs btn-bouncy">None</button>
+                        <button onclick="setHat('souwester')" class="p-3 rounded-xl bg-amber-950/80 border border-amber-500/40 font-bold text-xs btn-bouncy">Yellow Sou'wester Hat 🧢</button>
+                        <button onclick="setHat('beanie')" class="p-3 rounded-xl bg-amber-950/80 border border-amber-500/40 font-bold text-xs btn-bouncy">Cozy Knit Beanie 🧶</button>
+                        <button onclick="setHat('crown')" class="p-3 rounded-xl bg-amber-950/80 border border-amber-500/40 font-bold text-xs btn-bouncy">Autumn Leaf Crown 👑</button>
+                    </div>
+                </div>
+
+                <!-- Motorboat Hull Paint -->
+                <div>
+                    <label class="text-xs font-bold text-amber-300 block mb-2">Motorboat Hull Finish</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setBoatColor(0x2b6cb0)" class="p-2.5 rounded-xl bg-blue-700 border border-blue-300 font-bold text-xs btn-bouncy">Nautical Blue</button>
+                        <button onclick="setBoatColor(0xc53030)" class="p-2.5 rounded-xl bg-red-700 border border-red-300 font-bold text-xs btn-bouncy">Crimson Red</button>
+                        <button onclick="setBoatColor(0x2f855a)" class="p-2.5 rounded-xl bg-emerald-700 border border-emerald-300 font-bold text-xs btn-bouncy">Hunter Green</button>
+                    </div>
+                </div>
+
+                <!-- Boat String Lights -->
+                <div class="flex justify-between items-center bg-amber-950/60 p-3 rounded-2xl border border-amber-500/30">
+                    <div>
+                        <div class="text-xs font-bold text-amber-200">Boat Fairy String Lights 💡</div>
+                        <div class="text-[10px] text-amber-300/80">Glows brightly during dusk and evening boat rides!</div>
+                    </div>
+                    <button onclick="toggleBoatLights()" class="bg-gradient-to-r from-amber-500 to-orange-500 text-amber-950 font-black text-xs px-4 py-2 rounded-xl btn-bouncy">
+                        Toggle Lights
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TACKLE SHOP MODAL -->
+    <div id="shop-modal" class="hidden absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-40 p-4">
+        <div class="glass-panel p-5 sm:p-6 rounded-3xl max-w-lg w-full max-h-[85dvh] flex flex-col text-amber-100">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-amber-500/30">
+                <div>
+                    <h2 class="font-black text-base sm:text-lg text-amber-200 flex items-center space-x-2">
+                        <span>🛒</span> <span>Riverfront Tackle & Bait Shop</span>
+                    </h2>
+                    <p class="text-[10px] sm:text-xs text-amber-300/80">Trade fish for coins & purchase specialized fishing gear!</p>
+                </div>
+                <button id="btn-shop-close" class="text-amber-300 font-bold hover:text-white text-xl p-1">✕</button>
+            </div>
+
+            <div class="bg-amber-950/60 p-3 rounded-2xl border border-amber-500/30 flex justify-between items-center mb-4">
+                <div>
+                    <div class="text-xs font-bold text-amber-200">Fish Catch Bucket</div>
+                    <div id="shop-bucket-text" class="text-[10px] text-amber-300/80">0 fish available to sell</div>
+                </div>
+                <button id="btn-sell-fish" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-amber-950 font-black text-xs px-4 py-2 rounded-xl btn-bouncy">
+                    Sell All Fish 💰
+                </button>
+            </div>
+
+            <div id="shop-items-list" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                <!-- Dynamic Items -->
+            </div>
+        </div>
+    </div>
+
+    <!-- FISHING MINIGAME BOX -->
+    <div id="minigame-box" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 glass-panel p-5 rounded-3xl z-30 pointer-events-auto flex flex-col items-center text-center shadow-2xl">
+        <div class="text-2xl mb-1 animate-bounce">🎣</div>
+        <h3 class="font-extrabold text-amber-200 text-sm sm:text-base">FISH ON THE LINE!</h3>
+        <p class="text-amber-300/80 text-[11px] mb-3">Keep tension inside the green catch zone!</p>
+
+        <div class="relative w-full h-44 bg-amber-950/80 rounded-2xl overflow-hidden border-2 border-amber-400/40 p-2">
+            <div id="target-zone" class="absolute left-2 right-2 bg-emerald-500/50 border-y-2 border-emerald-300 rounded-lg transition-all duration-75"></div>
+            <div id="reel-indicator" class="absolute left-3 right-3 h-4 bg-gradient-to-r from-amber-200 to-amber-400 rounded-full border-2 border-white shadow-lg transition-all duration-75"></div>
+        </div>
+
+        <div class="w-full mt-3 bg-amber-950/70 rounded-full h-3 border border-amber-500/30 overflow-hidden">
+            <div id="reel-progress" class="bg-gradient-to-r from-amber-400 to-emerald-400 h-full w-0 transition-all duration-100"></div>
+        </div>
+
+        <p class="text-[10px] text-amber-300/70 mt-2 font-semibold">Hold REEL button or SPACE to raise tension</p>
+    </div>
+
+    <!-- CATCH CELEBRATION MODAL -->
+    <div id="catch-modal" class="hidden absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+        <div class="glass-panel p-6 rounded-3xl max-w-sm w-full text-center flex flex-col items-center border-4 border-amber-400 shadow-2xl">
+            <div id="caught-emoji" class="text-6xl my-2 animate-bounce">🐟</div>
+            <h2 id="caught-title" class="font-black text-xl text-amber-200">Golden Autumn Salmon!</h2>
+            <p id="caught-weight" class="text-xs text-amber-300 font-bold mt-1">Weight: 12.4 lbs • Worth +45G</p>
+            <p id="caught-flavor" class="text-xs text-amber-100/90 my-3 italic bg-amber-950/50 p-3 rounded-2xl border border-amber-500/20">Glisters in deep island river channels!</p>
+            <button id="btn-catch-dismiss" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-amber-950 font-black px-6 py-2.5 rounded-2xl btn-bouncy text-sm w-full shadow-lg">
+                KEEP FISH 🐟
+            </button>
+        </div>
+    </div>
+
+    <!-- JOURNAL & POLAROID ALBUM MODAL -->
+    <div id="journal-modal" class="hidden absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-40 p-4">
+        <div class="glass-panel p-5 sm:p-6 rounded-3xl max-w-md w-full max-h-[85dvh] flex flex-col text-amber-100">
+            <div class="flex justify-between items-center mb-3 pb-2 border-b border-amber-500/30">
+                <div class="flex space-x-2">
+                    <button id="tab-fish-guide" onclick="switchJournalTab('fish')" class="font-black text-xs px-3 py-1.5 rounded-xl bg-amber-500 text-amber-950 btn-bouncy">
+                        📖 Fish Guide
+                    </button>
+                    <button id="tab-photo-album" onclick="switchJournalTab('photos')" class="font-black text-xs px-3 py-1.5 rounded-xl bg-amber-950/80 text-amber-300 btn-bouncy">
+                        📷 Photo Album
+                    </button>
+                </div>
+                <button id="btn-journal-close" class="text-amber-300 font-bold hover:text-white text-xl">✕</button>
+            </div>
+
+            <div id="journal-fish-content" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                <!-- Dynamic Content -->
+            </div>
+
+            <div id="journal-photo-content" class="hidden flex-1 overflow-y-auto pr-1">
+                <div id="photo-gallery-grid" class="grid grid-cols-2 gap-3">
+                    <!-- Dynamic Snapshots -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-msg" class="hidden absolute top-16 left-1/2 -translate-x-1/2 glass-panel bg-amber-900/90 text-amber-200 font-bold text-xs sm:text-sm px-5 py-2 rounded-full z-30 border border-amber-400/40 shadow-xl transition-all duration-300 pointer-events-none">
+        Notice message
+    </div>
+
+    <!-- PORTRAIT ORIENTATION WARNING -->
+    <div id="orientation-warning" class="fixed inset-0 bg-amber-950 z-50 flex flex-col items-center justify-center text-center p-6 text-amber-200">
+        <div class="text-5xl mb-4 animate-bounce">🔄</div>
+        <h2 class="text-xl font-black mb-2">Rotate Your Device</h2>
+        <p class="text-xs text-amber-300/80 max-w-xs">For the best river boating and fishing experience, please rotate your device to landscape mode!</p>
+    </div>
+
+    <!-- GAME LOGIC SCRIPT -->
+    <script>
+        const FISH_SPECIES = [
+            { id: 'bass', name: "Whispering Bass", emoji: "🐟", value: 20, points: 100, weightRange: [2.5, 5.5], difficulty: 1, regions: ["Oakwood Haven Pier", "Pebble Shoal Beach", "Maple Ridge Bank", "Fox Hollow Isle", "Heron Point Islet"], flavor: "Loves crisp autumn waters around wooden docks." },
+            { id: 'perch', name: "Maple Leaf Perch", emoji: "🍁", value: 25, points: 120, weightRange: [1.5, 3.8], difficulty: 1, regions: ["Oakwood Haven Pier", "Pebble Shoal Beach", "Golden Birch Shoal", "Whispering Pine Key"], flavor: "Named for its reddish fins matching autumn leaves." },
+            { id: 'flounder', name: "Amber Flounder", emoji: "🐡", value: 35, points: 150, weightRange: [3.0, 7.5], difficulty: 2, regions: ["Maple Ridge Bank", "Duckling Cove Sound", "Fox Hollow Isle", "Salmon Leap Isle"], flavor: "Rests along sandy riverbanks under falling foliage." },
+            { id: 'salmon', name: "Golden Fall Salmon", emoji: "🐠", value: 55, points: 250, weightRange: [8.0, 16.0], difficulty: 3, regions: ["Duckling Cove Sound", "Mist Channel Deep", "Badger Creek Reach", "Salmon Leap Isle", "Golden Sunken Atoll"], flavor: "Glisters in deep river channels near outer islands." },
+            { id: 'pike', name: "King River Pike", emoji: "🐊", value: 95, points: 450, weightRange: [14.0, 28.0], difficulty: 4, regions: ["Mist Channel Deep", "Echo Falls Basin", "Owl Peak Outlook", "Golden Sunken Atoll"], flavor: "A legendary predator of deep river currents!" },
+            { id: 'catfish', name: "Whispering Catfish", emoji: "🦈", value: 120, points: 600, weightRange: [18.0, 35.0], difficulty: 5, regions: ["Echo Falls Basin", "Owl Peak Outlook", "Golden Sunken Atoll"], flavor: "Mythical giant residing only near the roaring Echo Falls!" }
+        ];
+
+        const ROD_GEAR = [
+            { id: 'stick', name: "Willow Stick Rod", cost: 0, power: 1.0, zoneBonus: 0, desc: "A cozy wooden twig with fishing line." },
+            { id: 'bamboo', name: "Polished Bamboo Rod", cost: 120, power: 1.3, zoneBonus: 8, desc: "Wider green catch zone for smooth reeling." },
+            { id: 'carbon', name: "Pro Carbon Fiber Rod", cost: 350, power: 1.7, zoneBonus: 18, desc: "Easily reels in heavy deep-water river monsters!" }
+        ];
+
+        const STATE = {
+            mode: 'TITLE',
+            lastVehicleMode: 'WALK',
+            gameTitleName: 'Echo Falls: Autumn Isles',
+            
+            // Player position
+            playerPos: new THREE.Vector3(5.5, 1.45, 61.5),
+            playerRotY: 0,
+            playerVel: new THREE.Vector3(),
+            isSwimming: false,
+            
+            // Boat position
+            boatPos: new THREE.Vector3(8.5, 0.2, 63.0),
+            boatRotY: 0,
+            boatSpeed: 0,
+            
+            currentIsland: "Oakwood Haven Pier",
+            activeNPC: null,
+            bobberPos: new THREE.Vector3(),
+            
+            // Economy & Customization
+            coins: 40,
+            derbyScore: 0,
+            fishBucket: [],
+            journal: {},
+            photoGallery: [],
+            equippedRod: 'stick',
+
+            // Apparel & Boat Apparel
+            scarfColor: 0x9b2c2c,
+            hatType: 'none',
+            boatColor: 0x2b6cb0,
+            boatLights: true,
+
+            // Day / Twilight Cycle
+            dayTime: 0.2, // 0 = Midday, 0.5 = Golden Hour, 0.8 = Dusk, 1.0 = Twilight Night
+
+            // Minigame State
+            fishTargetPos: 50,
+            reelProgress: 35,
+            tension: 0,
+            targetFish: null,
+            isReeling: false,
+            minigameTimer: 0
+        };
+
+        let scene, camera, renderer, clock;
+        let postScene, postCamera, postMaterial, renderTarget;
+        let player, boat, rodMesh, lineMesh, bobberMesh, waterMesh, shovelMesh, boatBeaconMesh;
+        let boatGlowLight;
+        let playerScarfMesh, playerHatMesh = null, boatHullMesh, boatLightGroup;
+        let islandMeshes = [], npcEntities = [], crabEntities = [], birdEntities = [], underwaterFish = [];
+        let foamRings = [], leafParticles = [], windGustGroup = [], skyClouds = [];
+        let smokeParticles = [], dirtParticles = [], digSpotEntities = [], chimneyEmitMeshes = [];
+        let leafPiles = [], fireflyGroup = [], riverMistParticles = [], waterRipples = [], waterFlora = [];
+        let cabinWindowMeshes = [], campfirePointLights = [];
+        let worldColliders = [];
+        let footstepTimer = 0, birdSoundTimer = 0, timeCycleSpeed = 0.005, titleCamAngle = 0;
+
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                this.bgmTimer = null;
+                this.bgmStep = 0;
+
+                this.bassGain = null;
+                this.walkGain = null;
+                this.boatGain = null;
+                this.fishingGain = null;
+                this.windGain = null;
+                this.windFilter = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+
+                    this.bassGain = this.ctx.createGain();
+                    this.walkGain = this.ctx.createGain();
+                    this.boatGain = this.ctx.createGain();
+                    this.fishingGain = this.ctx.createGain();
+
+                    this.bassGain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    this.walkGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                    this.boatGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+                    this.fishingGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+
+                    this.bassGain.connect(this.ctx.destination);
+                    this.walkGain.connect(this.ctx.destination);
+                    this.boatGain.connect(this.ctx.destination);
+                    this.fishingGain.connect(this.ctx.destination);
+
+                    // Continuous Wind Sound Generator
+                    const noiseBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
+                    const output = noiseBuf.getChannelData(0);
+                    for (let i = 0; i < noiseBuf.length; i++) output[i] = Math.random() * 2 - 1;
+
+                    const whiteNoise = this.ctx.createBufferSource();
+                    whiteNoise.buffer = noiseBuf;
+                    whiteNoise.loop = true;
+
+                    this.windFilter = this.ctx.createBiquadFilter();
+                    this.windFilter.type = 'lowpass';
+                    this.windFilter.frequency.setValueAtTime(250, this.ctx.currentTime);
+
+                    this.windGain = this.ctx.createGain();
+                    this.windGain.gain.setValueAtTime(0.03, this.ctx.currentTime);
+
+                    whiteNoise.connect(this.windFilter);
+                    this.windFilter.connect(this.windGain);
+                    this.windGain.connect(this.ctx.destination);
+                    whiteNoise.start();
+
+                    this.startBGM();
+                } catch(e) {
+                    console.warn("Audio Context init fallback", e);
+                }
+            }
+
+            startBGM() {
+                if (!this.ctx || this.bgmTimer) return;
+
+                const N = {
+                    G2: 98.00, A2: 110.00, B2: 123.47, C3: 130.81, D3: 146.83, E3: 164.81, E2: 82.41,
+                    G3: 196.00, A3: 220.00, B3: 246.94, C4: 261.63, D4: 293.66, E4: 329.63, Fs4: 369.99,
+                    G4: 392.00, A4: 440.00, B4: 493.88, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880.00
+                };
+
+                const bassStem = [
+                    N.G2, null, N.G2, null, N.E2, null, N.E2, null,
+                    N.C3, null, N.C3, null, N.D3, null, N.D3, null
+                ];
+
+                const walkStem = [
+                    N.B3, null, N.D4, null, N.G4, null, null, null,
+                    N.E4, null, N.G4, null, N.B4, null, null, null
+                ];
+
+                const boatStem = [
+                    N.D5, N.E5, N.G5, N.G5, N.E5, N.D5, N.B4, N.D5,
+                    N.E5, N.G5, N.A5, N.B4, N.A5, N.G5, N.E5, N.D5
+                ];
+
+                const fishingStem = [
+                    N.G4, N.B4, N.D5, N.G4, N.B4, N.D5, N.E5, N.D5,
+                    N.G5, N.E5, N.D5, N.B4, N.A4, N.G4, N.A4, N.B4
+                ];
+
+                const stepTime = 0.38;
+
+                this.bgmTimer = setInterval(() => {
+                    if (!this.ctx || !this.enabled) return;
+                    try {
+                        const now = this.ctx.currentTime;
+                        const idx = this.bgmStep % bassStem.length;
+
+                        // Continuous Bassline
+                        if (bassStem[idx]) {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            osc.type = 'triangle';
+                            osc.frequency.setValueAtTime(bassStem[idx], now);
+                            gain.gain.setValueAtTime(0.35, now);
+                            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                            osc.connect(gain);
+                            gain.connect(this.bassGain);
+                            osc.start(now);
+                            osc.stop(now + 0.35);
+                        }
+
+                        // Walking Melody
+                        if (walkStem[idx]) {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(walkStem[idx], now);
+                            gain.gain.setValueAtTime(0.25, now);
+                            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                            osc.connect(gain);
+                            gain.connect(this.walkGain);
+                            osc.start(now);
+                            osc.stop(now + 0.3);
+                        }
+
+                        // Boating Melody
+                        if (boatStem[idx]) {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            osc.type = 'triangle';
+                            osc.frequency.setValueAtTime(boatStem[idx], now);
+                            gain.gain.setValueAtTime(0.32, now);
+                            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+                            osc.connect(gain);
+                            gain.connect(this.boatGain);
+                            osc.start(now);
+                            osc.stop(now + 0.32);
+                        }
+
+                        // Fishing Minigame Melody
+                        if (fishingStem[idx]) {
+                            const osc = this.ctx.createOscillator();
+                            const gain = this.ctx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(fishingStem[idx], now);
+                            gain.gain.setValueAtTime(0.18, now);
+                            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                            osc.connect(gain);
+                            gain.connect(this.fishingGain);
+                            osc.start(now);
+                            osc.stop(now + 0.22);
+                        }
+
+                        this.bgmStep++;
+                    } catch(e){}
+                }, stepTime * 1000);
+            }
+
+            updateAudioForState(mode, boatSpeed = 0) {
+                if (!this.ctx || !this.bassGain) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const smooth = 0.4;
+
+                    if (mode === 'TITLE') {
+                        this.walkGain.gain.setTargetAtTime(0.03, now, smooth);
+                        this.boatGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.fishingGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.windGain.gain.setTargetAtTime(0.015, now, smooth);
+                    } else if (mode === 'WALK' || mode === 'SWIMMING' || mode === 'DIALOGUE') {
+                        this.walkGain.gain.setTargetAtTime(0.05, now, smooth);
+                        this.boatGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.fishingGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.windGain.gain.setTargetAtTime(0.02, now, smooth);
+                        this.windFilter.frequency.setTargetAtTime(200, now, smooth);
+                    } else if (mode === 'BOAT') {
+                        this.walkGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.boatGain.gain.setTargetAtTime(0.12, now, smooth);
+                        this.fishingGain.gain.setTargetAtTime(0.0, now, smooth);
+
+                        const speedRatio = Math.min(boatSpeed / 16, 1.0);
+                        this.windGain.gain.setTargetAtTime(0.02 + speedRatio * 0.08, now, smooth);
+                        this.windFilter.frequency.setTargetAtTime(220 + speedRatio * 600, now, smooth);
+                    } else if (mode === 'FISHING_WAIT') {
+                        this.walkGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.boatGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.fishingGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.windGain.gain.setTargetAtTime(0.015, now, smooth);
+                    } else if (mode === 'FISHING_MINIGAME') {
+                        this.walkGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.boatGain.gain.setTargetAtTime(0.0, now, smooth);
+                        this.fishingGain.gain.setTargetAtTime(0.14, now, smooth);
+                    }
+                } catch(e){}
+            }
+
+            playCameraShutter() {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } catch(e){}
+            }
+
+            playLeafRustle() {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(320 + Math.random() * 120, now);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } catch(e){}
+            }
+
+            playFootstep(isWater = false) {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = isWater ? 'sine' : 'triangle';
+                    osc.frequency.setValueAtTime(isWater ? 220 : 130 + Math.random() * 35, now);
+                    if (isWater) osc.frequency.exponentialRampToValueAtTime(110, now + 0.12);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + (isWater ? 0.12 : 0.08));
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + (isWater ? 0.12 : 0.08));
+                } catch(e){}
+            }
+
+            playDigSound() {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(80, now + 0.18);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.18);
+                } catch(e){}
+            }
+
+            playCoinSound() {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const notes = [987.77, 1318.51];
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.2);
+                    });
+                } catch(e){}
+            }
+
+            playBirdChirp() {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    const baseF = 1800 + Math.random() * 600;
+                    osc.frequency.setValueAtTime(baseF, now);
+                    osc.frequency.exponentialRampToValueAtTime(baseF + 400, now + 0.06);
+                    osc.frequency.exponentialRampToValueAtTime(baseF - 200, now + 0.14);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.14);
+                } catch(e){}
+            }
+
+            playSplash(distFromPlayer = 0) {
+                if (!this.ctx || !this.enabled) return;
+                if (distFromPlayer > 22) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(320, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.25);
+                    const vol = Math.max(0.02, 0.2 * (1.0 - distFromPlayer / 22.0));
+                    gain.gain.setValueAtTime(vol, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } catch(e){}
+            }
+
+            playAnimalese(species = 'cat') {
+                if (!this.ctx || !this.enabled) return;
+                try {
+                    let basePitch = 420;
+                    if (species === 'frog') basePitch = 210;
+                    else if (species === 'dog') basePitch = 300;
+                    else if (species === 'duck') basePitch = 520;
+                    else if (species === 'badger') basePitch = 180;
+                    else if (species === 'owl') basePitch = 260;
+                    else if (species === 'squirrel') basePitch = 600;
+                    else if (species === 'fox') basePitch = 480;
+
+                    const count = 4 + Math.floor(Math.random() * 3);
+                    let time = this.ctx.currentTime;
+                    for (let i = 0; i < count; i++) {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        const shift = (Math.random() - 0.5) * 110;
+                        osc.type = species === 'duck' ? 'sawtooth' : (species === 'frog' ? 'triangle' : 'sine');
+                        osc.frequency.setValueAtTime(basePitch + shift, time);
+                        gain.gain.setValueAtTime(0.12, time);
+                        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(time);
+                        osc.stop(time + 0.07);
+                        time += 0.08;
+                    }
+                } catch(e){}
+            }
+        }
+
+        const sound = new SoundManager();
+        let hemiLight, ambientLight, sunLight;
+
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x387885);
+            scene.fog = new THREE.FogExp2(0x387885, 0.005);
+
+            camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 400);
+            camera.position.set(20, 22, 90);
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true, preserveDrawingBuffer: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            clock = new THREE.Clock();
+
+            // Lighting Setup - Dynamic Day/Dusk/Twilight Cycle
+            hemiLight = new THREE.HemisphereLight(0xffe8c5, 0x1f383e, 0.65);
+            scene.add(hemiLight);
+
+            ambientLight = new THREE.AmbientLight(0xffd099, 0.45);
+            scene.add(ambientLight);
+
+            sunLight = new THREE.DirectionalLight(0xffa142, 1.4);
+            sunLight.position.set(70, 90, 50);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 1024;
+            sunLight.shadow.mapSize.height = 1024;
+            sunLight.shadow.camera.near = 10;
+            sunLight.shadow.camera.far = 250;
+            const d = 120;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            sunLight.shadow.bias = -0.0005;
+            scene.add(sunLight);
+
+            // Water Mesh
+            const waterGeo = new THREE.PlaneGeometry(1000, 1000, 36, 36);
+            waterGeo.rotateX(-Math.PI / 2);
+
+            const waterMat = new THREE.MeshPhongMaterial({
+                color: 0x1fa6b8,
+                emissive: 0x08424e,
+                specular: 0xfff8e7,
+                shininess: 120,
+                transparent: true,
+                opacity: 0.58,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            waterMesh = new THREE.Mesh(waterGeo, waterMat);
+            waterMesh.receiveShadow = true;
+            waterMesh.renderOrder = 1;
+            scene.add(waterMesh);
+
+            initPostProcessing();
+
+            buildRiverbanks();
+            buildArchipelago();
+            buildPlayer();
+            buildBoat();
+            buildBobber();
+            buildParticlesAndAtmosphere();
+            buildWildlife();
+            buildFloraAndLeafPiles();
+        }
+
+        function initPostProcessing() {
+            const scale = 0.82;
+            const width = Math.floor(window.innerWidth * scale);
+            const height = Math.floor(window.innerHeight * scale);
+
+            renderTarget = new THREE.WebGLRenderTarget(width, height, {
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                format: THREE.RGBAFormat
+            });
+
+            postScene = new THREE.Scene();
+            postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+            postMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    tDiffuse: { value: null },
+                    uResolution: { value: new THREE.Vector2(width, height) },
+                    uPixelSize: { value: 1.2 },
+                    uBloomIntensity: { value: 0.55 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    precision highp float;
+                    uniform sampler2D tDiffuse;
+                    uniform vec2 uResolution;
+                    uniform float uPixelSize;
+                    uniform float uBloomIntensity;
+                    varying vec2 vUv;
+
+                    void main() {
+                        vec2 dxy = uPixelSize / uResolution;
+                        vec2 uv = dxy * floor(vUv / dxy);
+
+                        vec4 color = texture2D(tDiffuse, uv);
+
+                        // Toon Outlines
+                        vec2 px = (uPixelSize * 0.85) / uResolution;
+                        vec3 cU = texture2D(tDiffuse, uv + vec2(0.0, px.y)).rgb;
+                        vec3 cD = texture2D(tDiffuse, uv - vec2(0.0, px.y)).rgb;
+                        vec3 cL = texture2D(tDiffuse, uv - vec2(px.x, 0.0)).rgb;
+                        vec3 cR = texture2D(tDiffuse, uv + vec2(px.x, 0.0)).rgb;
+                        
+                        vec3 diff = abs(cU - cD) + abs(cL - cR);
+                        float edge = max(max(diff.r, diff.g), diff.b);
+                        float outline = smoothstep(0.08, 0.28, edge);
+                        
+                        color.rgb *= mix(1.0, 0.22, outline * 0.85);
+
+                        // Bloom Pass
+                        vec2 blurSize = 2.8 / uResolution;
+                        vec4 sum = vec4(0.0);
+                        sum += texture2D(tDiffuse, uv + vec2(-blurSize.x, -blurSize.y)) * 0.15;
+                        sum += texture2D(tDiffuse, uv + vec2( blurSize.x, -blurSize.y)) * 0.15;
+                        sum += texture2D(tDiffuse, uv + vec2(0.0, 0.0))               * 0.40;
+                        sum += texture2D(tDiffuse, uv + vec2(-blurSize.x,  blurSize.y)) * 0.15;
+                        sum += texture2D(tDiffuse, uv + vec2( blurSize.x,  blurSize.y)) * 0.15;
+
+                        vec3 bloom = max(sum.rgb - vec3(0.50), vec3(0.0)) * uBloomIntensity;
+                        color.rgb += bloom;
+
+                        // Warm Color Grading
+                        vec3 warmTint = vec3(1.08, 0.98, 0.88);
+                        color.rgb *= warmTint;
+                        color.rgb = pow(max(color.rgb, vec3(0.0)), vec3(1.05));
+
+                        // Vignette
+                        vec2 dist = (vUv - 0.5) * 1.35;
+                        float vign = 1.0 - dot(dist, dist);
+                        vign = clamp(vign, 0.32, 1.0);
+                        color.rgb *= vign;
+
+                        gl_FragColor = color;
+                    }
+                `
+            });
+
+            const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial);
+            postScene.add(quad);
+        }
+
+        function buildRiverbanks() {
+            const borderMat = new THREE.MeshLambertMaterial({ color: 0x7a431d });
+            const grassTopMat = new THREE.MeshLambertMaterial({ color: 0xd9822b });
+
+            const northBank = new THREE.Group();
+            northBank.position.set(0, 3, -530);
+            const northGeo = new THREE.BoxGeometry(700, 8, 40);
+            const northMesh = new THREE.Mesh(northGeo, borderMat);
+            northMesh.receiveShadow = true;
+            northBank.add(northMesh);
+
+            const northGrass = new THREE.Mesh(new THREE.BoxGeometry(700, 0.5, 40), grassTopMat);
+            northGrass.position.y = 4.2;
+            northGrass.receiveShadow = true;
+            northBank.add(northGrass);
+            scene.add(northBank);
+
+            const southBank = new THREE.Group();
+            southBank.position.set(0, 3, 160);
+            const southMesh = new THREE.Mesh(northGeo, borderMat);
+            southMesh.receiveShadow = true;
+            southBank.add(southMesh);
+
+            const southGrass = new THREE.Mesh(new THREE.BoxGeometry(700, 0.5, 40), grassTopMat);
+            southGrass.position.y = 4.2;
+            southGrass.receiveShadow = true;
+            southBank.add(southGrass);
+            scene.add(southBank);
+
+            for (let x = -320; x <= 320; x += 14) {
+                createTree(northBank, x, 4.2, (Math.random() - 0.5) * 15);
+                createTree(southBank, x, 4.2, (Math.random() - 0.5) * 15);
+            }
+        }
+
+        function createTree(parent, x, y, z) {
+            const treeGroup = new THREE.Group();
+            treeGroup.position.set(x, y, z);
+
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3, 0.45, 3, 6),
+                new THREE.MeshLambertMaterial({ color: 0x503522 })
+            );
+            trunk.position.y = 1.5;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            treeGroup.add(trunk);
+
+            const leafColors = [0xd35400, 0xe67e22, 0xf1c40f, 0xc0392b, 0xca6f1e];
+            const folColor = leafColors[Math.floor(Math.random() * leafColors.length)];
+
+            const foliage = new THREE.Mesh(
+                new THREE.SphereGeometry(2.2 + Math.random() * 0.8, 7, 7),
+                new THREE.MeshLambertMaterial({ color: folColor })
+            );
+            foliage.position.y = 3.8;
+            foliage.castShadow = true;
+            foliage.receiveShadow = true;
+            treeGroup.add(foliage);
+
+            parent.add(treeGroup);
+        }
+
+        function createOrganicCylinder(topRadius, bottomRadius, height, segments, seed) {
+            const geo = new THREE.CylinderGeometry(topRadius, bottomRadius, height, segments, 2);
+            const pos = geo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const angle = Math.atan2(z, x);
+                const dist = Math.hypot(x, z);
+
+                if (dist > 0.4) {
+                    const noise = Math.sin(angle * 3 + seed) * 0.22 + 
+                                  Math.cos(angle * 5 + seed * 1.4) * 0.14 + 
+                                  Math.sin(angle * 7 + seed * 2.1) * 0.08;
+                    pos.setX(i, x * (1.0 + noise));
+                    pos.setZ(i, z * (1.0 + noise));
+                }
+            }
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        function createOrganicRing(innerR, outerR, segments, seed) {
+            const geo = new THREE.RingGeometry(innerR, outerR, segments, 1);
+            geo.rotateX(-Math.PI / 2);
+            const pos = geo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const angle = Math.atan2(z, x);
+                const dist = Math.hypot(x, z);
+
+                if (dist > 0.1) {
+                    const noise = Math.sin(angle * 3 + seed) * 0.22 + 
+                                  Math.cos(angle * 5 + seed * 1.4) * 0.14 + 
+                                  Math.sin(angle * 7 + seed * 2.1) * 0.08;
+                    pos.setX(i, x * (1.0 + noise));
+                    pos.setZ(i, z * (1.0 + noise));
+                }
+            }
+            return geo;
+        }
+
+        function createCozyCabin(parent, x, y, z, rotY = 0) {
+            const cabinGroup = new THREE.Group();
+            cabinGroup.position.set(x, y, z);
+            cabinGroup.rotation.y = rotY;
+
+            const house = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.4, 3.6), new THREE.MeshLambertMaterial({ color: 0x8b4513 }));
+            house.position.y = 1.2;
+            house.castShadow = true;
+            house.receiveShadow = true;
+            cabinGroup.add(house);
+
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.8, 4), new THREE.MeshLambertMaterial({ color: 0x5c2c16 }));
+            roof.rotation.y = Math.PI / 4;
+            roof.position.y = 3.1;
+            roof.castShadow = true;
+            cabinGroup.add(roof);
+
+            const windowMat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
+            for (let wx of [-1.2, 1.2]) {
+                const win = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.1), windowMat);
+                win.position.set(wx, 1.5, 1.82);
+                cabinGroup.add(win);
+                cabinWindowMeshes.push(win);
+            }
+
+            const chimneyMat = new THREE.MeshLambertMaterial({ color: 0x5a5a5a });
+            const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.2, 0.6), chimneyMat);
+            chimney.position.set(1.1, 2.8, -0.8);
+            chimney.castShadow = true;
+            cabinGroup.add(chimney);
+
+            chimneyEmitMeshes.push(chimney);
+            parent.add(cabinGroup);
+        }
+
+        function createCampfire(parent, x, y, z) {
+            const fireGroup = new THREE.Group();
+            fireGroup.position.set(x, y, z);
+
+            const stoneMat = new THREE.MeshLambertMaterial({ color: 0x6e6e6e });
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2;
+                const stone = new THREE.Mesh(new THREE.SphereGeometry(0.22, 5, 5), stoneMat);
+                stone.position.set(Math.cos(a) * 0.7, 0.1, Math.sin(a) * 0.7);
+                stone.castShadow = true;
+                fireGroup.add(stone);
+            }
+
+            const ash = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.08, 8), new THREE.MeshLambertMaterial({ color: 0x1f1f1f }));
+            ash.position.y = 0.04;
+            fireGroup.add(ash);
+
+            for (let i = 0; i < 3; i++) {
+                const log = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 5), new THREE.MeshLambertMaterial({ color: 0x3d2314 }));
+                log.rotation.z = Math.PI / 3;
+                log.rotation.y = (i / 3) * Math.PI * 2;
+                log.position.y = 0.15;
+                log.castShadow = true;
+                fireGroup.add(log);
+            }
+
+            const pLight = new THREE.PointLight(0xff7722, 0.0, 12);
+            pLight.position.y = 0.6;
+            fireGroup.add(pLight);
+            campfirePointLights.push(pLight);
+
+            parent.add(fireGroup);
+        }
+
+        function createFence(parent, startX, startZ, endX, endZ, yHeight) {
+            const fenceGroup = new THREE.Group();
+            const dx = endX - startX;
+            const dz = endZ - startZ;
+            const dist = Math.hypot(dx, dz);
+            const angle = Math.atan2(dx, dz);
+            const postCount = Math.max(2, Math.floor(dist / 2.2));
+
+            const woodMat = new THREE.MeshLambertMaterial({ color: 0x5e381c });
+
+            for (let i = 0; i < postCount; i++) {
+                const t = i / (postCount - 1);
+                const px = startX + dx * t;
+                const pz = startZ + dz * t;
+
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 1.2, 5), woodMat);
+                post.position.set(px, yHeight + 0.6, pz);
+                post.castShadow = true;
+                fenceGroup.add(post);
+            }
+
+            for (let rY of [0.4, 0.85]) {
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, dist), woodMat);
+                rail.position.set((startX + endX) / 2, yHeight + rY, (startZ + endZ) / 2);
+                rail.rotation.y = angle;
+                rail.castShadow = true;
+                fenceGroup.add(rail);
+            }
+
+            parent.add(fenceGroup);
+        }
+
+        function createBoulders(parent, x, y, z, count = 3) {
+            const rockGroup = new THREE.Group();
+            rockGroup.position.set(x, y, z);
+            const rockMat = new THREE.MeshLambertMaterial({ color: 0x7c8285 });
+
+            for (let i = 0; i < count; i++) {
+                const scale = 0.5 + Math.random() * 0.8;
+                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(scale, 1), rockMat);
+                rock.position.set((Math.random() - 0.5) * 1.5, scale * 0.4, (Math.random() - 0.5) * 1.5);
+                rock.rotation.set(Math.random(), Math.random(), Math.random());
+                rock.castShadow = true;
+                rockGroup.add(rock);
+            }
+            parent.add(rockGroup);
+        }
+
+        function createDigSpot(parent, x, surfaceY, z, rewardG = 25, isReal = true) {
+            const digGroup = new THREE.Group();
+            digGroup.position.set(x, surfaceY + 0.06, z);
+
+            const moundGeo = new THREE.CylinderGeometry(0.8, 1.0, 0.12, 8);
+            const moundMat = new THREE.MeshLambertMaterial({ color: 0x4a2712 });
+            const mound = new THREE.Mesh(moundGeo, moundMat);
+            mound.receiveShadow = true;
+            mound.castShadow = true;
+            digGroup.add(mound);
+
+            const timberMat = new THREE.MeshLambertMaterial({ color: 0x331808 });
+            for (let angle of [Math.PI / 4, -Math.PI / 4]) {
+                const beam = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.28), timberMat);
+                beam.rotation.y = angle;
+                beam.position.y = 0.07;
+                beam.castShadow = true;
+                digGroup.add(beam);
+            }
+
+            let glintMesh = null;
+            if (isReal) {
+                const starGeo = new THREE.OctahedronGeometry(0.22, 0);
+                const starMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f });
+                glintMesh = new THREE.Mesh(starGeo, starMat);
+                glintMesh.position.y = 0.35;
+                digGroup.add(glintMesh);
+            }
+
+            parent.add(digGroup);
+
+            digSpotEntities.push({
+                group: digGroup,
+                glint: glintMesh,
+                worldPos: new THREE.Vector3(),
+                reward: rewardG,
+                isReal: isReal,
+                dug: false
+            });
+        }
+
+        function buildArchipelago() {
+            worldColliders = [];
+            
+            const islandData = [
+                { id: 'town', name: "Oakwood Haven Pier", x: 0, z: 45, r: 16, h: 1.2, color: 0xd9802a, npc: 'pip', npcType: 'cat', npcName: "Cousin Pip", npcText: "Ahoy cousin! Hop into our boat moored at the town pier deck and let's explore upriver to Echo Falls!", sign: true, dock: true, shop: true, cabin: false, digSpots: [{x: -5, z: -4, g: 30, real: true}, {x: 4, z: 2, g: 0, real: false}] },
+                { id: 'pebble', name: "Pebble Shoal Beach", x: -55, z: 0, r: 17, h: 1.5, color: 0xcc6f20, npc: 'ribbit', npcType: 'frog', npcName: "Mayor Ribbit", npcText: "Croak! Golden Fall Salmon love swimming near deep river channels on the way to Echo Falls!", sign: true, dock: false, cabin: false, digSpots: [{x: 4, z: -3, g: 25, real: true}, {x: -3, z: 4, g: 0, real: false}] },
+                { id: 'maple', name: "Maple Ridge Bank", x: 60, z: -45, r: 18, h: 2.2, color: 0xe08b29, npc: 'barkley', npcType: 'dog', npcName: "Captain Barkley", npcText: "Woof! Trade caught fish at Oakwood Tackle Shop for upgraded carbon rods before heading to the falls!", sign: true, dock: true, cabin: true, digSpots: [{x: -6, z: 5, g: 35, real: true}, {x: 3, z: -6, g: 0, real: false}] },
+                { id: 'fox', name: "Fox Hollow Isle", x: -20, z: -70, r: 15, h: 1.8, color: 0xd87a22, npc: 'poppy', npcType: 'fox', npcName: "Poppy the Fox", npcText: "Yip! Search all 14 islands along this river for hidden treasure mounds!", sign: true, dock: false, cabin: true, digSpots: [{x: 3, z: 3, g: 35, real: true}, {x: -4, z: -2, g: 0, real: false}] },
+                { id: 'cove', name: "Duckling Cove Sound", x: -65, z: -115, r: 20, h: 2.5, color: 0xd47320, npc: 'quackers', npcType: 'duck', npcName: "Quackers", npcText: "Quack! Check out Mist Channel up river for King River Pike!", sign: true, dock: false, cabin: true, digSpots: [{x: 5, z: 4, g: 40, real: true}, {x: -4, z: -2, g: 0, real: false}] },
+                { id: 'birch', name: "Golden Birch Shoal", x: 45, z: -155, r: 17, h: 1.6, color: 0xe59828, npc: 'hazel', npcType: 'squirrel', npcName: "Hazel", npcText: "Squeak! Search for cracked earth marks with timber 'X' beams to dig up gold!", sign: true, dock: false, cabin: false, digSpots: [{x: -3, z: -3, g: 25, real: true}, {x: 5, z: 3, g: 0, real: false}] },
+                { id: 'heron', name: "Heron Point Islet", x: -10, z: -190, r: 16, h: 1.4, color: 0xdc8626, npc: 'pippin', npcType: 'duck', npcName: "Pippin", npcText: "Quack quack! The water gets deeper as you travel north toward Echo Falls!", sign: true, dock: true, cabin: false, digSpots: [{x: 2, z: -4, g: 30, real: true}] },
+                { id: 'badger', name: "Badger Creek Reach", x: -60, z: -235, r: 19, h: 2.0, color: 0xc86a1e, npc: 'barnaby', npcType: 'badger', npcName: "Barnaby", npcText: "Grump! I buried real gold coins around these timber 'X' dirt mounds...", sign: true, dock: true, cabin: true, digSpots: [{x: 4, z: -5, g: 50, real: true}, {x: -5, z: 2, g: 0, real: false}] },
+                { id: 'pine', name: "Whispering Pine Key", x: 55, z: -275, r: 17, h: 2.1, color: 0xd98024, npc: 'pete', npcType: 'dog', npcName: "Ranger Pete", npcText: "Arf! The autumn river derby spans all the way up to Echo Falls Basin!", sign: true, dock: false, cabin: true, digSpots: [{x: -4, z: 3, g: 45, real: true}, {x: 3, z: -4, g: 0, real: false}] },
+                { id: 'mist', name: "Mist Channel Deep", x: -15, z: -320, r: 18, h: 1.8, color: 0xca621b, npc: 'ollie', npcType: 'owl', npcName: "Ollie", npcText: "Hoo! Deep outer channels hold the legendary King River Pike!", sign: true, dock: false, cabin: false, digSpots: [{x: 2, z: 3, g: 45, real: true}] },
+                { id: 'salmon', name: "Salmon Leap Isle", x: 60, z: -365, r: 18, h: 2.4, color: 0xe28a2a, npc: 'sami', npcType: 'cat', npcName: "Sami", npcText: "Meow! Golden Salmon leap around this fast river bend near Echo Falls!", sign: true, dock: true, cabin: true, digSpots: [{x: 4, z: 4, g: 55, real: true}, {x: -3, z: -4, g: 0, real: false}] },
+                { id: 'echo', name: "Echo Falls Basin", x: -45, z: -415, r: 22, h: 3.0, color: 0xdf8c28, npc: 'gordy', npcType: 'frog', npcName: "Elder Gordy", npcText: "Ribbit! You reached Echo Falls Basin! Whispering Catfish reside right below the roaring falls!", sign: true, dock: false, cabin: true, digSpots: [{x: -7, z: -4, g: 60, real: true}, {x: 4, z: 5, g: 0, real: false}] },
+                { id: 'owl', name: "Owl Peak Outlook", x: 25, z: -455, r: 19, h: 2.8, color: 0xd47822, npc: 'hoots', npcType: 'owl', npcName: "Professor Hoots", npcText: "Hoo! Look down into the clear basin water to see massive fish shadow silhouettes!", sign: true, dock: false, cabin: false, digSpots: [{x: 3, z: -5, g: 65, real: true}] },
+                { id: 'golden', name: "Golden Sunken Atoll", x: -10, z: -495, r: 20, h: 1.5, color: 0xe6922d, npc: 'finley', npcType: 'fox', npcName: "Captain Finley", npcText: "Yip! You've reached the furthest northern atoll of Echo Falls!", sign: true, dock: true, cabin: true, digSpots: [{x: -5, z: 3, g: 100, real: true}, {x: 4, z: -2, g: 0, real: false}] }
+            ];
+
+            islandData.forEach((data, idx) => {
+                const group = new THREE.Group();
+                group.position.set(data.x, 0, data.z);
+
+                const grassY = data.h + 0.12;
+
+                const aoGeo = createOrganicCylinder(data.r + 2.0, data.r + 2.2, 0.05, 28, idx * 3.7);
+                const aoMat = new THREE.MeshBasicMaterial({ color: 0x0f2a2e, transparent: true, opacity: 0.35 });
+                const aoMesh = new THREE.Mesh(aoGeo, aoMat);
+                aoMesh.position.y = -0.1;
+                group.add(aoMesh);
+
+                const shoreGeo = createOrganicCylinder(data.r + 1.2, data.r + 1.6, 0.1, 28, idx * 3.7);
+                const shoreMat = new THREE.MeshBasicMaterial({ color: 0xd6b485, side: THREE.DoubleSide });
+                const shore = new THREE.Mesh(shoreGeo, shoreMat);
+                shore.position.y = 0.05;
+                shore.receiveShadow = true;
+                group.add(shore);
+
+                for (let rIdx = 0; rIdx < 2; rIdx++) {
+                    const ringGeo = createOrganicRing(data.r - 0.2, data.r + 1.8, 32, idx * 3.7);
+                    const ringMat = new THREE.MeshBasicMaterial({
+                        color: 0xe0f7fa,
+                        transparent: true,
+                        opacity: 0.5,
+                        side: THREE.DoubleSide
+                    });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.position.set(0, 0.08, 0);
+                    group.add(ring);
+                    foamRings.push({ mesh: ring, offset: rIdx * Math.PI, phase: idx * 0.7 });
+                }
+
+                const baseGeo = createOrganicCylinder(data.r, data.r + 1.5, data.h, 28, idx * 3.7);
+                const baseMat = new THREE.MeshLambertMaterial({ color: 0x733e1a });
+                const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.y = data.h / 2;
+                base.receiveShadow = true;
+                base.castShadow = true;
+                group.add(base);
+
+                const grassGeo = createOrganicCylinder(data.r - 0.2, data.r, 0.25, 28, idx * 3.7);
+                const grassMat = new THREE.MeshLambertMaterial({ color: data.color });
+                const grass = new THREE.Mesh(grassGeo, grassMat);
+                grass.position.y = grassY;
+                grass.receiveShadow = true;
+                grass.castShadow = true;
+                group.add(grass);
+
+                if (data.cabin) {
+                    const cX = -data.r * 0.4, cZ = data.r * 0.2;
+                    createCozyCabin(group, cX, grassY, cZ, Math.PI / 6);
+                    worldColliders.push({ x: data.x + cX, z: data.z + cZ, radius: 2.6 });
+                }
+
+                if (data.shop) {
+                    const sX = -data.r * 0.4, sZ = data.r * 0.2;
+                    const shopGroup = new THREE.Group();
+                    shopGroup.position.set(sX, grassY, sZ);
+
+                    const house = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.2, 3.5), new THREE.MeshLambertMaterial({ color: 0x9c4826 }));
+                    house.position.y = 1.1;
+                    house.castShadow = true;
+                    house.receiveShadow = true;
+                    shopGroup.add(house);
+
+                    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.6, 4), new THREE.MeshLambertMaterial({ color: 0x5e2b17 }));
+                    roof.rotation.y = Math.PI / 4;
+                    roof.position.y = 2.9;
+                    roof.castShadow = true;
+                    shopGroup.add(roof);
+
+                    const shopSign = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.7, 0.2), new THREE.MeshLambertMaterial({ color: 0x276a78 }));
+                    shopSign.position.set(0, 2.0, 1.8);
+                    shopSign.castShadow = true;
+                    shopGroup.add(shopSign);
+
+                    group.add(shopGroup);
+                    worldColliders.push({ x: data.x + sX, z: data.z + sZ, radius: 2.8 });
+                }
+
+                if (data.digSpots) {
+                    data.digSpots.forEach(ds => {
+                        createDigSpot(group, ds.x, grassY, ds.z, ds.g, ds.real);
+                    });
+                }
+
+                createFence(group, -data.r * 0.5, data.r * 0.6, data.r * 0.5, data.r * 0.6, grassY);
+                createBoulders(group, data.r * 0.45, grassY, data.r * 0.35, 3);
+                worldColliders.push({ x: data.x + data.r * 0.45, z: data.z + data.r * 0.35, radius: 1.5 });
+
+                if (data.id === 'pebble' || data.id === 'cove' || data.id === 'pine') {
+                    createCampfire(group, 3, grassY, 2);
+                }
+
+                for (let i = 0; i < 18; i++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const dist = Math.random() * (data.r - 2.5);
+                    const tuft = new THREE.Mesh(
+                        new THREE.ConeGeometry(0.2, 0.5, 4),
+                        new THREE.MeshLambertMaterial({ color: 0xed9e32 })
+                    );
+                    tuft.position.set(Math.cos(ang) * dist, grassY + 0.25, Math.sin(ang) * dist);
+                    tuft.castShadow = true;
+                    group.add(tuft);
+                }
+
+                const treeCount = 6 + Math.floor(Math.random() * 4);
+                let addedTrees = 0;
+                for (let attempt = 0; attempt < 35 && addedTrees < treeCount; attempt++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const dist = (0.50 + Math.random() * 0.35) * (data.r - 2.5);
+                    const tx = Math.cos(ang) * dist;
+                    const tz = Math.sin(ang) * dist;
+
+                    const wx = data.x + tx;
+                    const wz = data.z + tz;
+
+                    let overlaps = false;
+                    for (let col of worldColliders) {
+                        if (Math.hypot(wx - col.x, wz - col.z) < col.radius + 1.8) {
+                            overlaps = true;
+                            break;
+                        }
+                    }
+
+                    if (!overlaps) {
+                        createTree(group, tx, grassY, tz);
+                        worldColliders.push({ x: wx, z: wz, radius: 0.8 });
+                        addedTrees++;
+                    }
+                }
+
+                if (data.sign) {
+                    const signGroup = new THREE.Group();
+                    signGroup.position.set(0, grassY, data.r - 2.5);
+
+                    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.4), new THREE.MeshLambertMaterial({ color: 0x4a2e1b }));
+                    post.position.y = 0.7;
+                    post.castShadow = true;
+                    signGroup.add(post);
+
+                    const board = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 0.15), new THREE.MeshLambertMaterial({ color: 0x8c532b }));
+                    board.position.set(0, 1.2, 0);
+                    board.castShadow = true;
+                    signGroup.add(board);
+
+                    group.add(signGroup);
+                }
+
+                if (data.dock) {
+                    const dockGroup = new THREE.Group();
+                    dockGroup.position.set(5.5, 0, data.r - 1.5);
+
+                    const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.2, 2.5), new THREE.MeshLambertMaterial({ color: 0x7c4c28 }));
+                    ramp.position.set(0, grassY - 0.25, 0);
+                    ramp.rotation.x = Math.PI / 16;
+                    ramp.castShadow = true;
+                    dockGroup.add(ramp);
+
+                    const dockDeck = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.25, 6.0), new THREE.MeshLambertMaterial({ color: 0x6e4323 }));
+                    dockDeck.position.set(0, 0.65, 3.8);
+                    dockDeck.castShadow = true;
+                    dockDeck.receiveShadow = true;
+                    dockGroup.add(dockDeck);
+
+                    for (let px of [-1.3, 1.3]) {
+                        for (let pz of [1.5, 3.8, 6.0]) {
+                            const piling = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.6), new THREE.MeshLambertMaterial({ color: 0x402511 }));
+                            piling.position.set(px, -0.15, pz);
+                            piling.castShadow = true;
+                            dockGroup.add(piling);
+                        }
+                    }
+
+                    group.add(dockGroup);
+                }
+
+                if (data.npc) {
+                    const npcGroup = new THREE.Group();
+                    npcGroup.position.set(2, grassY, data.r - 4);
+
+                    const colorMap = {
+                        frog: 0x38a169, dog: 0xd69e2e, duck: 0xdd6b20,
+                        badger: 0x4a5568, owl: 0x805ad5, squirrel: 0xc05621, cat: 0xed8936, fox: 0xdd6b20
+                    };
+                    const color = colorMap[data.npcType] || 0xed8936;
+
+                    const npcBody = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.35, 0.4, 1.1, 8),
+                        new THREE.MeshLambertMaterial({ color: color })
+                    );
+                    npcBody.position.y = 0.55;
+                    npcBody.castShadow = true;
+                    npcGroup.add(npcBody);
+
+                    const npcHead = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.4, 8, 8),
+                        new THREE.MeshLambertMaterial({ color: color })
+                    );
+                    npcHead.position.y = 1.35;
+                    npcHead.castShadow = true;
+                    npcGroup.add(npcHead);
+
+                    group.add(npcGroup);
+
+                    npcEntities.push({
+                        id: data.npc,
+                        name: data.npcName,
+                        type: data.npcType,
+                        text: data.npcText,
+                        worldPos: new THREE.Vector3(data.x + 2, grassY + 0.6, data.z + data.r - 4),
+                        hasShop: !!data.shop
+                    });
+                }
+
+                scene.add(group);
+                islandMeshes.push({ 
+                    id: data.id, 
+                    name: data.name, 
+                    pos: new THREE.Vector3(data.x, 0, data.z), 
+                    radius: data.r, 
+                    height: data.h, 
+                    dock: data.dock
+                });
+            });
+
+            scene.updateMatrixWorld(true);
+            digSpotEntities.forEach(ds => {
+                ds.worldPos.setFromMatrixPosition(ds.group.matrixWorld);
+            });
+        }
+
+        function buildFloraAndLeafPiles() {
+            islandMeshes.forEach((isl, i) => {
+                for (let p = 0; p < 2; p++) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const r = (Math.random() * 0.6) * (isl.radius - 3);
+                    const lx = isl.pos.x + Math.cos(ang) * r;
+                    const lz = isl.pos.z + Math.sin(ang) * r;
+
+                    const pileGroup = new THREE.Group();
+                    pileGroup.position.set(lx, isl.height + 0.12, lz);
+
+                    const leafMat = new THREE.MeshLambertMaterial({ color: 0xd35400 });
+                    for (let m = 0; m < 5; m++) {
+                        const mound = new THREE.Mesh(new THREE.SphereGeometry(0.6 + Math.random() * 0.3, 5, 5), leafMat);
+                        mound.position.set((Math.random() - 0.5) * 0.6, 0.1, (Math.random() - 0.5) * 0.6);
+                        mound.scale.set(1, 0.3, 1);
+                        mound.castShadow = true;
+                        pileGroup.add(mound);
+                    }
+
+                    scene.add(pileGroup);
+                    leafPiles.push({ group: pileGroup, island: isl, worldPos: new THREE.Vector3(lx, isl.height + 0.12, lz), active: true });
+                }
+            });
+
+            waterFlora = [];
+            const stemMat = new THREE.MeshLambertMaterial({ color: 0x2f855a });
+            const topMat = new THREE.MeshLambertMaterial({ color: 0x4a2e12 });
+            const padMat = new THREE.MeshLambertMaterial({ color: 0x276749 });
+
+            islandMeshes.forEach((isl, i) => {
+                const clusterCount = 4 + (i % 3);
+                for (let cl = 0; cl < clusterCount; cl++) {
+                    const clusterAngle = (cl / clusterCount) * Math.PI * 2 + (i * 0.5);
+                    const clusterDist = isl.radius + 1.2 + Math.random() * 1.8;
+                    const cx = isl.pos.x + Math.cos(clusterAngle) * clusterDist;
+                    const cz = isl.pos.z + Math.sin(clusterAngle) * clusterDist;
+
+                    const patchSize = 10 + Math.floor(Math.random() * 6);
+                    for (let r = 0; r < patchSize; r++) {
+                        const rx = cx + (Math.random() - 0.5) * 2.4;
+                        const rz = cz + (Math.random() - 0.5) * 2.4;
+
+                        if (Math.random() < 0.22) {
+                            const padGeo = new THREE.CylinderGeometry(0.45 + Math.random() * 0.25, 0.45 + Math.random() * 0.25, 0.04, 7);
+                            const pad = new THREE.Mesh(padGeo, padMat);
+                            pad.position.set(rx, 0.08, rz);
+                            pad.castShadow = true;
+                            scene.add(pad);
+                            waterFlora.push({ mesh: pad, type: 'pad', basePos: pad.position.clone() });
+                        } else {
+                            const reedGroup = new THREE.Group();
+                            reedGroup.position.set(rx, 0, rz);
+
+                            const reedH = 1.4 + Math.random() * 0.8;
+                            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, reedH, 4), stemMat);
+                            stem.position.y = reedH / 2;
+                            stem.castShadow = true;
+                            reedGroup.add(stem);
+
+                            const top = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.35 + Math.random() * 0.15, 5), topMat);
+                            top.position.y = reedH;
+                            top.castShadow = true;
+                            reedGroup.add(top);
+
+                            scene.add(reedGroup);
+                            waterFlora.push({ mesh: reedGroup, type: 'reed', basePos: reedGroup.position.clone() });
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateCustomizer() {
+            if (playerScarfMesh) playerScarfMesh.material.color.setHex(STATE.scarfColor);
+            if (boatHullMesh) boatHullMesh.material.color.setHex(STATE.boatColor);
+            if (boatLightGroup) boatLightGroup.visible = STATE.boatLights;
+
+            if (playerHatMesh) {
+                player.remove(playerHatMesh);
+                playerHatMesh = null;
+            }
+
+            if (STATE.hatType === 'souwester') {
+                playerHatMesh = new THREE.Mesh(new THREE.ConeGeometry(0.65, 0.4, 8), new THREE.MeshLambertMaterial({ color: 0xf6e05e }));
+                playerHatMesh.position.set(0, 1.75, 0);
+                player.add(playerHatMesh);
+            } else if (STATE.hatType === 'beanie') {
+                playerHatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 8), new THREE.MeshLambertMaterial({ color: 0xdd6b20 }));
+                playerHatMesh.position.set(0, 1.65, 0);
+                player.add(playerHatMesh);
+            } else if (STATE.hatType === 'crown') {
+                playerHatMesh = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.08, 6, 12), new THREE.MeshLambertMaterial({ color: 0xd69e2e }));
+                playerHatMesh.rotation.x = Math.PI / 2;
+                playerHatMesh.position.set(0, 1.68, 0);
+                player.add(playerHatMesh);
+            }
+        }
+
+        window.setScarfColor = function(colorHex) {
+            STATE.scarfColor = colorHex;
+            updateCustomizer();
+            showToast("Updated Scarf Apparel!");
+        };
+
+        window.setHat = function(hatType) {
+            STATE.hatType = hatType;
+            updateCustomizer();
+            showToast("Equipped Headwear!");
+        };
+
+        window.setBoatColor = function(colorHex) {
+            STATE.boatColor = colorHex;
+            updateCustomizer();
+            showToast("Painted Motorboat Hull!");
+        };
+
+        window.toggleBoatLights = function() {
+            STATE.boatLights = !STATE.boatLights;
+            updateCustomizer();
+            showToast(STATE.boatLights ? "Boat Fairy Lights ON 💡" : "Boat Fairy Lights OFF");
+        };
+
+        function buildPlayer() {
+            player = new THREE.Group();
+
+            const body = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.38, 0.45, 1.1, 8),
+                new THREE.MeshLambertMaterial({ color: 0xed8936 })
+            );
+            body.position.y = 0.55;
+            body.castShadow = true;
+            player.add(body);
+
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(0.42, 8, 8),
+                new THREE.MeshLambertMaterial({ color: 0xed8936 })
+            );
+            head.position.y = 1.3;
+            head.castShadow = true;
+            player.add(head);
+
+            for (let x of [-0.2, 0.2]) {
+                const ear = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 4), new THREE.MeshLambertMaterial({ color: 0xc05621 }));
+                ear.position.set(x, 1.7, 0);
+                ear.castShadow = true;
+                player.add(ear);
+            }
+
+            playerScarfMesh = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.1, 6, 12), new THREE.MeshLambertMaterial({ color: STATE.scarfColor }));
+            playerScarfMesh.rotation.x = Math.PI / 2;
+            playerScarfMesh.position.y = 1.05;
+            playerScarfMesh.castShadow = true;
+            player.add(playerScarfMesh);
+
+            rodMesh = new THREE.Group();
+            const rodPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.08, 2.6, 6), new THREE.MeshLambertMaterial({ color: 0x744210 }));
+            rodPole.position.y = 1.3;
+            rodPole.rotation.z = -Math.PI / 6;
+            rodPole.castShadow = true;
+            rodMesh.add(rodPole);
+            rodMesh.position.set(0.3, 0.6, 0);
+            player.add(rodMesh);
+
+            shovelMesh = new THREE.Group();
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6, 5), new THREE.MeshLambertMaterial({ color: 0x6e4323 }));
+            handle.position.y = 0.8;
+            shovelMesh.add(handle);
+
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.05), new THREE.MeshLambertMaterial({ color: 0x718096 }));
+            blade.position.y = 0.1;
+            shovelMesh.add(blade);
+            shovelMesh.position.set(-0.3, 0.4, 0.2);
+            shovelMesh.visible = false;
+            player.add(shovelMesh);
+
+            player.position.copy(STATE.playerPos);
+            scene.add(player);
+
+            updateCustomizer();
+        }
+
+        function buildBoat() {
+            boat = new THREE.Group();
+
+            boatHullMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.8, 0.6, 8), new THREE.MeshLambertMaterial({ color: STATE.boatColor }));
+            boatHullMesh.rotation.z = Math.PI / 2;
+            boatHullMesh.scale.set(1, 2.3, 1);
+            boatHullMesh.castShadow = true;
+            boatHullMesh.receiveShadow = true;
+            boat.add(boatHullMesh);
+
+            const deck = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 2.8), new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
+            deck.position.y = 0.2;
+            deck.castShadow = true;
+            deck.receiveShadow = true;
+            boat.add(deck);
+
+            const engine = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), new THREE.MeshLambertMaterial({ color: 0x1a202c }));
+            engine.position.set(0, 0.4, -1.3);
+            engine.castShadow = true;
+            boat.add(engine);
+
+            const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.6), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+            flagPole.position.set(0, 1.0, -1.3);
+            boat.add(flagPole);
+
+            const flagMesh = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.4, 0.6), new THREE.MeshLambertMaterial({ color: 0xe53e3e }));
+            flagMesh.position.set(0, 1.5, -1.6);
+            boat.add(flagMesh);
+
+            boatGlowLight = new THREE.PointLight(0xffb74d, 0.0, 24, 1.2);
+            boatGlowLight.position.set(0, 1.2, 0);
+            boatGlowLight.castShadow = false;
+            boat.add(boatGlowLight);
+
+            boatLightGroup = new THREE.Group();
+            for (let i = 0; i < 6; i++) {
+                const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 5), new THREE.MeshBasicMaterial({ color: 0xf6e05e }));
+                bulb.position.set((Math.random() - 0.5) * 1.2, 0.5, (i / 6) * 2.4 - 1.2);
+                boatLightGroup.add(bulb);
+            }
+            boat.add(boatLightGroup);
+
+            const beaconGeo = new THREE.CylinderGeometry(0.2, 0.2, 12, 8);
+            const beaconMat = new THREE.MeshBasicMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.35 });
+            boatBeaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+            boatBeaconMesh.position.set(0, 6.5, 0);
+            boat.add(boatBeaconMesh);
+
+            boat.position.copy(STATE.boatPos);
+            boat.rotation.y = STATE.boatRotY;
+            scene.add(boat);
+        }
+
+        function buildBobber() {
+            bobberMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.2, 8, 8),
+                new THREE.MeshLambertMaterial({ color: 0xe53e3e })
+            );
+            bobberMesh.visible = false;
+            scene.add(bobberMesh);
+
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+            lineMesh = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.8, transparent: true }));
+            lineMesh.visible = false;
+            scene.add(lineMesh);
+        }
+
+        function buildParticlesAndAtmosphere() {
+            fireflyGroup = [];
+            const orbGeo = new THREE.SphereGeometry(0.12, 6, 6);
+            const haloGeo = new THREE.SphereGeometry(0.28, 6, 6);
+
+            islandMeshes.forEach((isl, i) => {
+                for (let k = 0; k < 6; k++) {
+                    const fly = new THREE.Group();
+                    const a = Math.random() * Math.PI * 2;
+                    const r = Math.random() * (isl.radius * 0.85);
+
+                    const orbMat = new THREE.MeshBasicMaterial({ color: 0xfff366 });
+                    const orb = new THREE.Mesh(orbGeo, orbMat);
+                    fly.add(orb);
+
+                    const haloMat = new THREE.MeshBasicMaterial({ color: 0xffa812, transparent: true, opacity: 0.45, depthWrite: false });
+                    const halo = new THREE.Mesh(haloGeo, haloMat);
+                    fly.add(halo);
+
+                    const posX = isl.pos.x + Math.cos(a) * r;
+                    const posY = isl.height + 0.8 + Math.random() * 2.2;
+                    const posZ = isl.pos.z + Math.sin(a) * r;
+                    fly.position.set(posX, posY, posZ);
+                    fly.visible = false;
+
+                    scene.add(fly);
+                    fireflyGroup.push({
+                        group: fly,
+                        orbMat: orbMat,
+                        haloMat: haloMat,
+                        basePosY: posY,
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+            });
+
+            riverMistParticles = [];
+            const mistMat = new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.0, depthWrite: false });
+            for (let i = 0; i < 20; i++) {
+                const mistCluster = new THREE.Group();
+                const puffCount = 3 + Math.floor(Math.random() * 3);
+                for (let p = 0; p < puffCount; p++) {
+                    const puff = new THREE.Mesh(new THREE.SphereGeometry(1.5 + Math.random() * 1.2, 6, 6), mistMat);
+                    puff.position.set((p - puffCount / 2) * 1.8, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 1.5);
+                    puff.scale.set(1.4, 0.4, 1.4);
+                    mistCluster.add(puff);
+                }
+                const startX = (Math.random() - 0.5) * 280;
+                const startZ = -220 + (Math.random() - 0.5) * 440;
+                mistCluster.position.set(startX, 1.0 + Math.random() * 0.8, startZ);
+                scene.add(mistCluster);
+                riverMistParticles.push({
+                    group: mistCluster,
+                    mat: mistMat,
+                    basePosY: mistCluster.position.y,
+                    speed: 1.2 + Math.random() * 1.0,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+
+            const leafGeo = new THREE.BufferGeometry();
+            const count = 180;
+            const positions = new Float32Array(count * 3);
+            for (let i = 0; i < count * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 260;
+                positions[i + 1] = 2 + Math.random() * 14;
+                positions[i + 2] = -220 + (Math.random() - 0.5) * 440;
+            }
+            leafGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            leafParticles = new THREE.Points(
+                leafGeo,
+                new THREE.PointsMaterial({ color: 0xed8936, size: 0.38, transparent: true, opacity: 0.85 })
+            );
+            scene.add(leafParticles);
+
+            windGustGroup = [];
+            for (let i = 0; i < 8; i++) {
+                const points = [];
+                for (let j = 0; j < 12; j++) points.push(new THREE.Vector3(j * 0.8, 0, 0));
+                const windGeo = new THREE.BufferGeometry().setFromPoints(points);
+                const windMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 });
+                const windLine = new THREE.Line(windGeo, windMat);
+                windLine.position.set((Math.random() - 0.5) * 240, 3 + Math.random() * 8, -220 + (Math.random() - 0.5) * 440);
+                scene.add(windLine);
+                windGustGroup.push({ line: windLine, speed: 12 + Math.random() * 8, phase: Math.random() * Math.PI * 2 });
+            }
+
+            skyClouds = [];
+            for (let c = 0; c < 22; c++) {
+                const cloudGroup = new THREE.Group();
+                const cloudMat = new THREE.MeshStandardMaterial({
+                    color: 0xfff2e3,
+                    roughness: 0.85,
+                    transparent: true,
+                    opacity: 0.75,
+                    flatShading: true
+                });
+
+                const puffCount = 4 + Math.floor(Math.random() * 3);
+                for (let p = 0; p < puffCount; p++) {
+                    const puff = new THREE.Mesh(new THREE.SphereGeometry(4.0 + Math.random() * 4.5, 6, 6), cloudMat);
+                    puff.position.set((p - puffCount / 2) * 4.2, (Math.random() - 0.3) * 1.5, (Math.random() - 0.5) * 3.0);
+                    puff.castShadow = true;
+                    cloudGroup.add(puff);
+                }
+
+                cloudGroup.position.set((Math.random() - 0.5) * 520, 26 + Math.random() * 16, -220 + (Math.random() - 0.5) * 500);
+                scene.add(cloudGroup);
+                skyClouds.push({ group: cloudGroup, speed: 2.5 + Math.random() * 2.5 });
+            }
+        }
+
+        function buildWildlife() {
+            for (let i = 0; i < 16; i++) {
+                const crab = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 6), new THREE.MeshLambertMaterial({ color: 0xe53e3e }));
+                body.scale.set(1, 0.5, 1);
+                body.castShadow = true;
+                crab.add(body);
+
+                for (let x of [-0.1, 0.1]) {
+                    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+                    eye.position.set(x, 0.15, 0.2);
+                    crab.add(eye);
+                }
+
+                const randomIsl = islandMeshes[Math.floor(Math.random() * islandMeshes.length)];
+                const ang = Math.random() * Math.PI * 2;
+                crab.position.set(randomIsl.pos.x + Math.cos(ang) * (randomIsl.radius - 1.2), randomIsl.height + 0.15, randomIsl.pos.z + Math.sin(ang) * (randomIsl.radius - 1.2));
+
+                scene.add(crab);
+                crabEntities.push({
+                    mesh: crab,
+                    island: randomIsl,
+                    targetPos: crab.position.clone(),
+                    timer: Math.random() * 3
+                });
+            }
+
+            for (let i = 0; i < 18; i++) {
+                const birdGroup = new THREE.Group();
+
+                const birdBody = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.7, 4), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                birdBody.rotation.x = Math.PI / 2;
+                birdGroup.add(birdBody);
+
+                const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.25), new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }));
+                wingL.position.set(-0.3, 0, 0);
+                birdGroup.add(wingL);
+
+                const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.25), new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }));
+                wingR.position.set(0.3, 0, 0);
+                birdGroup.add(wingR);
+
+                const targetIsl = islandMeshes[i % islandMeshes.length];
+                const islandCenter = targetIsl ? targetIsl.pos : new THREE.Vector3(0, 0, 0);
+
+                birdGroup.position.set(islandCenter.x, 12 + Math.random() * 5, islandCenter.z);
+                scene.add(birdGroup);
+
+                birdEntities.push({
+                    group: birdGroup,
+                    wingL: wingL,
+                    wingR: wingR,
+                    center: islandCenter,
+                    speed: 8 + Math.random() * 4,
+                    ang: Math.random() * Math.PI * 2,
+                    radius: targetIsl ? targetIsl.radius + 8 + Math.random() * 12 : 25,
+                    height: 12 + Math.random() * 5
+                });
+            }
+
+            for (let i = 0; i < 85; i++) {
+                const fishGroup = new THREE.Group();
+
+                const species = FISH_SPECIES[i % FISH_SPECIES.length];
+                const diff = species.difficulty;
+
+                const scaleFactor = 0.55 + (diff * 0.45) + (Math.random() * 0.15);
+
+                const fishBody = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.22, 0.85, 5),
+                    new THREE.MeshLambertMaterial({ color: diff >= 4 ? 0x0b252b : 0x133840, transparent: true, opacity: 0.75 })
+                );
+                fishBody.rotation.x = -Math.PI / 2;
+                fishGroup.add(fishBody);
+
+                const tail = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.04, 0.3, 0.3),
+                    new THREE.MeshLambertMaterial({ color: diff >= 4 ? 0x06191d : 0x0e2b31, transparent: true, opacity: 0.75 })
+                );
+                tail.position.set(0, 0, -0.4);
+                fishGroup.add(tail);
+
+                fishGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+                let spawnX = (Math.random() - 0.5) * 240;
+                let spawnZ = -200 + (Math.random() - 0.5) * 440;
+
+                const matchingIslands = islandMeshes.filter(isl => species.regions.includes(isl.name));
+                if (matchingIslands.length > 0 && Math.random() < 0.85) {
+                    const targetIsl = matchingIslands[Math.floor(Math.random() * matchingIslands.length)];
+                    const ang = Math.random() * Math.PI * 2;
+                    const r = targetIsl.radius + 2 + Math.random() * 8;
+                    spawnX = targetIsl.pos.x + Math.cos(ang) * r;
+                    spawnZ = targetIsl.pos.z + Math.sin(ang) * r;
+                }
+
+                fishGroup.position.set(spawnX, -0.45, spawnZ);
+                scene.add(fishGroup);
+
+                underwaterFish.push({
+                    group: fishGroup,
+                    tail: tail,
+                    species: species,
+                    difficulty: diff,
+                    homePos: fishGroup.position.clone(),
+                    maxRadius: 18.0,
+                    speed: (3.2 - diff * 0.35) + Math.random() * 1.5,
+                    angle: Math.random() * Math.PI * 2,
+                    turnTimer: Math.random() * 4.0,
+                    isLeaping: false,
+                    leapTimer: Math.random() * 20.0
+                });
+            }
+        }
+
+        const keys = {};
+        const joystick = { active: false, x: 0, y: 0 };
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'e') triggerInteract();
+            if (e.key.toLowerCase() === 'f') triggerCast();
+            if (e.key.toLowerCase() === 'g') triggerDig();
+            if (e.key.toLowerCase() === 'escape') closePhotoMode();
+            if (e.code === 'Space') {
+                if (STATE.mode === 'TITLE') startGameFromTitle();
+                else STATE.isReeling = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            if (e.code === 'Space') STATE.isReeling = false;
+        });
+
+        document.addEventListener('pointerdown', () => sound.init(), { once: true });
+
+        const joyBase = document.getElementById('joystick-base');
+        const joyThumb = document.getElementById('joystick-thumb');
+
+        joyBase.addEventListener('touchstart', handleJoyTouch, { passive: false });
+        joyBase.addEventListener('touchmove', handleJoyTouch, { passive: false });
+        joyBase.addEventListener('touchend', () => {
+            joystick.active = false;
+            joystick.x = 0;
+            joystick.y = 0;
+            joyThumb.style.transform = `translate(0px, 0px)`;
+        });
+
+        function handleJoyTouch(e) {
+            e.preventDefault();
+            sound.init();
+            const touch = e.touches[0];
+            const rect = joyBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+            const maxR = 40;
+
+            if (dist > maxR) {
+                dx = (dx / dist) * maxR;
+                dy = (dy / dist) * maxR;
+            }
+
+            joyThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+            joystick.active = true;
+            joystick.x = dx / maxR;
+            joystick.y = dy / maxR;
+        }
+
+        function getMovementInput() {
+            let x = 0, z = 0;
+            if (keys['w'] || keys['arrowup']) z -= 1;
+            if (keys['s'] || keys['arrowdown']) z += 1;
+            if (keys['a'] || keys['arrowleft']) x -= 1;
+            if (keys['d'] || keys['arrowright']) x += 1;
+
+            if (joystick.active) {
+                x = joystick.x;
+                z = joystick.y;
+            }
+
+            const len = Math.hypot(x, z);
+            if (len > 1) { x /= len; z /= len; }
+            return { x, z };
+        }
+
+        window.changeTitleName = function(name) {
+            STATE.gameTitleName = name;
+            const mainTitle = document.getElementById('main-title-text');
+            const hudTitle = document.getElementById('hud-game-title');
+            
+            const shortName = name.split(':')[0];
+            if (mainTitle) mainTitle.innerText = shortName.toUpperCase();
+            if (hudTitle) hudTitle.innerText = shortName;
+        };
+
+        function startGameFromTitle() {
+            sound.init();
+            sound.playCoinSound();
+
+            const titleOverlay = document.getElementById('title-screen');
+            if (titleOverlay) {
+                titleOverlay.style.opacity = '0';
+                setTimeout(() => titleOverlay.classList.add('hidden'), 700);
+            }
+
+            STATE.mode = 'WALK';
+            showToast(`Welcome to ${STATE.gameTitleName}!`);
+        }
+
+        function updateLightingCycle(delta) {
+            STATE.dayTime = (STATE.dayTime + delta * timeCycleSpeed) % 1.0;
+            const t = STATE.dayTime;
+
+            let sunColor = new THREE.Color(0xffa142);
+            let fogColor = new THREE.Color(0x387885);
+            let skyBadgeText = "Golden Hour";
+            let skyBadgeIcon = "🌅";
+            let windowGlow = 0.0;
+            let fireflyAlpha = 0.0;
+            let targetFogDensity = 0.005;
+
+            if (t < 0.4) {
+                sunColor.setHex(0xffe2a3);
+                fogColor.setHex(0x387885);
+                skyBadgeText = "Midday Sun";
+                skyBadgeIcon = "☀️";
+                targetFogDensity = 0.004;
+            } else if (t < 0.7) {
+                sunColor.setHex(0xff8833);
+                fogColor.setHex(0x5c4a3e);
+                skyBadgeText = "Golden Hour";
+                skyBadgeIcon = "🌅";
+                windowGlow = (t - 0.4) / 0.3 * 0.5;
+                fireflyAlpha = (t - 0.4) / 0.3 * 0.5;
+                targetFogDensity = 0.008;
+            } else {
+                sunColor.setHex(0x334477);
+                fogColor.setHex(0x131f24);
+                skyBadgeText = "Twilight River";
+                skyBadgeIcon = "🌙";
+                windowGlow = 1.0;
+                fireflyAlpha = 1.0;
+                targetFogDensity = 0.013;
+            }
+
+            sunLight.color.lerp(sunColor, delta * 2);
+            scene.fog.color.lerp(fogColor, delta * 2);
+            scene.fog.density = THREE.MathUtils.lerp(scene.fog.density, targetFogDensity, delta * 2);
+            scene.background.lerp(fogColor, delta * 2);
+
+            const badgeTxt = document.getElementById('time-text');
+            const badgeIcon = document.getElementById('time-icon');
+            if (badgeTxt) badgeTxt.innerText = skyBadgeText;
+            if (badgeIcon) badgeIcon.innerText = skyBadgeIcon;
+
+            cabinWindowMeshes.forEach(w => {
+                w.material.color.setHex(windowGlow > 0.2 ? 0xffea78 : 0x7c6e4e);
+            });
+            campfirePointLights.forEach(pl => {
+                pl.intensity = windowGlow * 1.8;
+            });
+
+            fireflyGroup.forEach(fly => {
+                if (fireflyAlpha > 0.05) {
+                    fly.group.visible = true;
+                    fly.orbMat.opacity = fireflyAlpha;
+                    fly.haloMat.opacity = fireflyAlpha * 0.45;
+                } else {
+                    fly.group.visible = false;
+                }
+            });
+
+            riverMistParticles.forEach(m => {
+                if (m.mat) m.mat.opacity = windowGlow * 0.4;
+                if (windowGlow > 0.1) {
+                    m.group.position.x += delta * m.speed;
+                    m.group.position.y = m.basePosY + Math.sin(clock.getElapsedTime() * 1.2 + m.phase) * 0.15;
+                    if (m.group.position.x > 180) m.group.position.x = -180;
+                }
+            });
+
+            if (boatGlowLight) {
+                const glowTarget = windowGlow * 5.5;
+                boatGlowLight.intensity = THREE.MathUtils.lerp(boatGlowLight.intensity, glowTarget, delta * 3);
+            }
+        }
+
+        function updateFloraAndLeafPiles(delta) {
+            const time = clock.getElapsedTime();
+
+            leafPiles.forEach(pile => {
+                if (pile.active) {
+                    const dist = player.position.distanceTo(pile.worldPos);
+                    if (dist < 1.4 && (STATE.mode === 'WALK' || STATE.mode === 'SWIMMING')) {
+                        sound.playLeafRustle();
+                        for (let i = 0; i < 12; i++) {
+                            const leafP = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), new THREE.MeshLambertMaterial({ color: 0xd35400 }));
+                            leafP.position.copy(pile.worldPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.2, (Math.random() - 0.5) * 0.8));
+                            scene.add(leafP);
+                            dirtParticles.push({
+                                mesh: leafP,
+                                vel: new THREE.Vector3((Math.random() - 0.5) * 3.5, 2.0 + Math.random() * 2.5, (Math.random() - 0.5) * 3.5),
+                                life: 0.8
+                            });
+                        }
+                        pile.group.visible = false;
+                        pile.active = false;
+                        setTimeout(() => { pile.group.visible = true; pile.active = true; }, 12000);
+                    }
+                }
+            });
+
+            const entityPos = STATE.mode === 'BOAT' ? boat.position : player.position;
+            waterFlora.forEach(flora => {
+                const dist = entityPos.distanceTo(flora.basePos);
+                if (flora.type === 'reed') {
+                    const sway = Math.sin(time * 2.0 + flora.basePos.x) * 0.12;
+                    if (dist < 1.8) {
+                        const pushDir = flora.basePos.clone().sub(entityPos).normalize();
+                        flora.mesh.rotation.z = THREE.MathUtils.lerp(flora.mesh.rotation.z, pushDir.x * 0.6, delta * 8);
+                        flora.mesh.rotation.x = THREE.MathUtils.lerp(flora.mesh.rotation.x, pushDir.z * 0.6, delta * 8);
+                    } else {
+                        flora.mesh.rotation.z = THREE.MathUtils.lerp(flora.mesh.rotation.z, sway, delta * 3);
+                        flora.mesh.rotation.x = THREE.MathUtils.lerp(flora.mesh.rotation.x, 0, delta * 3);
+                    }
+                } else if (flora.type === 'pad') {
+                    const bob = Math.sin(time * 3.0 + flora.basePos.z) * 0.04;
+                    flora.mesh.position.y = flora.basePos.y + bob;
+                    if (dist < 1.2) {
+                        flora.mesh.position.y = THREE.MathUtils.lerp(flora.mesh.position.y, flora.basePos.y - 0.1, delta * 10);
+                    }
+                }
+            });
+        }
+
+        function updatePlayerMovement(delta) {
+            const input = getMovementInput();
+
+            if (STATE.mode === 'WALK' || STATE.mode === 'SWIMMING') {
+                const isSwim = STATE.mode === 'SWIMMING';
+                const speed = isSwim ? 3.6 : 7.5;
+                
+                STATE.playerVel.x = input.x * speed;
+                STATE.playerVel.z = input.z * speed;
+
+                player.position.x += STATE.playerVel.x * delta;
+                player.position.z += STATE.playerVel.z * delta;
+
+                if (input.x !== 0 || input.z !== 0) {
+                    STATE.playerRotY = Math.atan2(input.x, input.z);
+                    player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, STATE.playerRotY, delta * 12);
+
+                    footstepTimer += delta;
+                    if (footstepTimer > (isSwim ? 0.45 : 0.32)) {
+                        sound.playFootstep(isSwim);
+                        footstepTimer = 0;
+                    }
+                }
+
+                if (!isSwim) {
+                    worldColliders.forEach(col => {
+                        const cDist = Math.hypot(player.position.x - col.x, player.position.z - col.z);
+                        const minDist = col.radius + 0.45;
+                        if (cDist < minDist) {
+                            const pushAngle = Math.atan2(player.position.z - col.z, player.position.x - col.x);
+                            player.position.x = col.x + Math.cos(pushAngle) * minDist;
+                            player.position.z = col.z + Math.sin(pushAngle) * minDist;
+                        }
+                    });
+                }
+
+                let onDock = false;
+                let dockY = 0.8;
+
+                islandMeshes.forEach(isl => {
+                    if (isl.dock) {
+                        const dockCenterX = isl.pos.x + 5.5;
+                        const dockCenterZ = isl.pos.z + isl.radius + 1.8;
+                        const dx = Math.abs(player.position.x - dockCenterX);
+                        const dz = Math.abs(player.position.z - dockCenterZ);
+                        if (dx < 2.0 && dz < 3.2) {
+                            onDock = true;
+                            dockY = 0.8;
+                            STATE.currentIsland = isl.name;
+                            document.getElementById('location-text').innerText = isl.name;
+                        }
+                    }
+                });
+
+                let standingIsland = null;
+                islandMeshes.forEach(isl => {
+                    const dist = Math.hypot(player.position.x - isl.pos.x, player.position.z - isl.pos.z);
+                    if (dist < isl.radius) {
+                        standingIsland = isl;
+                    }
+                });
+
+                if (onDock) {
+                    STATE.mode = 'WALK';
+                    STATE.isSwimming = false;
+                    player.position.y = THREE.MathUtils.lerp(player.position.y, dockY, delta * 12);
+                    player.rotation.x = THREE.MathUtils.lerp(player.rotation.x, 0, delta * 10);
+                } else if (standingIsland) {
+                    STATE.mode = 'WALK';
+                    STATE.isSwimming = false;
+                    STATE.currentIsland = standingIsland.name;
+                    document.getElementById('location-text').innerText = standingIsland.name;
+
+                    player.position.y = THREE.MathUtils.lerp(player.position.y, standingIsland.height + 0.12, delta * 12);
+                    player.rotation.x = THREE.MathUtils.lerp(player.rotation.x, 0, delta * 10);
+                } else {
+                    STATE.mode = 'SWIMMING';
+                    STATE.isSwimming = true;
+                    
+                    const waterBob = Math.sin(clock.getElapsedTime() * 5.0) * 0.08;
+                    player.position.y = THREE.MathUtils.lerp(player.position.y, 0.25 + waterBob, delta * 8);
+                    player.rotation.x = THREE.MathUtils.lerp(player.rotation.x, Math.PI / 6, delta * 6);
+                }
+            } else if (STATE.mode === 'BOAT') {
+                const inputLen = Math.hypot(input.x, input.z);
+                if (inputLen > 0.1) {
+                    const targetAngle = Math.atan2(input.x, input.z);
+                    let diff = targetAngle - STATE.boatRotY;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+
+                    STATE.boatRotY += diff * delta * 6.0;
+                    STATE.boatSpeed = THREE.MathUtils.lerp(STATE.boatSpeed, 13.5 * inputLen, delta * 3.0);
+                } else {
+                    STATE.boatSpeed = THREE.MathUtils.lerp(STATE.boatSpeed, 0, delta * 3.5);
+                }
+
+                boat.rotation.y = STATE.boatRotY;
+                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.boatRotY);
+                boat.position.addScaledVector(forward, STATE.boatSpeed * delta);
+
+                islandMeshes.forEach(isl => {
+                    const dist = Math.hypot(boat.position.x - isl.pos.x, boat.position.z - isl.pos.z);
+                    const minDist = isl.radius + 1.2;
+                    if (dist < minDist) {
+                        const pushAngle = Math.atan2(boat.position.z - isl.pos.z, boat.position.x - isl.pos.x);
+                        boat.position.x = isl.pos.x + Math.cos(pushAngle) * minDist;
+                        boat.position.z = isl.pos.z + Math.sin(pushAngle) * minDist;
+                        STATE.boatSpeed *= -0.3;
+                    }
+                });
+
+                if (Math.abs(STATE.boatSpeed) > 2.0 && Math.random() < 0.35) {
+                    addWaterRipple(boat.position.clone().add(new THREE.Vector3(0, 0, -1.2).applyAxisAngle(new THREE.Vector3(0, 1, 0), STATE.boatRotY)));
+                }
+
+                player.position.copy(boat.position).add(new THREE.Vector3(0, 0.4, 0.2));
+                player.rotation.y = STATE.boatRotY;
+                player.rotation.x = 0;
+            }
+        }
+
+        function updateCamera(delta) {
+            if (STATE.mode === 'TITLE') {
+                titleCamAngle += delta * 0.18;
+                const camR = 48;
+                camera.position.x = Math.cos(titleCamAngle) * camR;
+                camera.position.z = Math.sin(titleCamAngle) * camR + 45;
+                camera.position.y = 22 + Math.sin(titleCamAngle * 1.5) * 4;
+                camera.lookAt(0, 2, 45);
+                camera.fov = 48;
+                camera.updateProjectionMatrix();
+                return;
+            }
+
+            const targetPos = STATE.mode === 'BOAT' ? boat.position : player.position;
+            const currentSpeed = STATE.mode === 'BOAT' ? STATE.boatSpeed : STATE.playerVel.length();
+
+            const targetFOV = THREE.MathUtils.lerp(42, 58, Math.min(currentSpeed / 15, 1.0));
+            camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, delta * 4);
+            camera.updateProjectionMatrix();
+
+            const offset = new THREE.Vector3(0, 16, 26);
+            const desiredCamPos = targetPos.clone().add(offset);
+            camera.position.lerp(desiredCamPos, delta * 4.5);
+            camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
+
+            const dx = boat.position.x - player.position.x;
+            const dz = boat.position.z - player.position.z;
+            const dist = Math.hypot(dx, dz);
+
+            const camDir = new THREE.Vector3();
+            camera.getWorldDirection(camDir);
+            const camAngle = Math.atan2(camDir.x, camDir.z);
+            const targetAngle = Math.atan2(dx, dz);
+            let relativeAngle = targetAngle - camAngle;
+
+            const arrowIcon = document.getElementById('boat-arrow-icon');
+            if (arrowIcon) {
+                arrowIcon.style.transform = `rotate(${relativeAngle}rad)`;
+            }
+            const distTxt = document.getElementById('compass-dist');
+            if (distTxt) {
+                distTxt.innerText = `${dist.toFixed(1)}m`;
+            }
+        }
+
+        function triggerDig() {
+            sound.init();
+            if (STATE.mode !== 'WALK') {
+                showToast("Cannot dig while swimming or boating!");
+                return;
+            }
+
+            shovelMesh.visible = true;
+            rodMesh.visible = false;
+            sound.playDigSound();
+
+            for (let i = 0; i < 12; i++) {
+                const dirtP = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08 + Math.random() * 0.08), new THREE.MeshLambertMaterial({ color: 0x5a341a }));
+                dirtP.position.copy(player.position).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.2, (Math.random() - 0.5) * 0.6));
+                scene.add(dirtP);
+                dirtParticles.push({
+                    mesh: dirtP,
+                    vel: new THREE.Vector3((Math.random() - 0.5) * 2.5, 2.5 + Math.random() * 2.0, (Math.random() - 0.5) * 2.5),
+                    life: 0.6
+                });
+            }
+
+            let foundSpot = null;
+            digSpotEntities.forEach(ds => {
+                if (!ds.dug && player.position.distanceTo(ds.worldPos) < 2.8) {
+                    foundSpot = ds;
+                }
+            });
+
+            if (foundSpot) {
+                foundSpot.dug = true;
+                foundSpot.group.visible = false;
+                
+                if (foundSpot.isReal) {
+                    STATE.coins += foundSpot.reward;
+                    document.getElementById('coins-text').innerText = `${STATE.coins}G`;
+                    sound.playCoinSound();
+                    showToast(`✨ Treasure unearthed! Found +${foundSpot.reward} Coins! 🪙`);
+                } else {
+                    showToast("⛏️ Dug cracked spot... Just old tree roots! (Dud Spot)");
+                }
+            } else {
+                showToast("Dug plain dirt... Look for raised dirt mounds with timber 'X' marks!");
+            }
+
+            setTimeout(() => {
+                shovelMesh.visible = false;
+                rodMesh.visible = true;
+            }, 800);
+        }
+
+        function triggerCast() {
+            sound.init();
+            if (STATE.mode === 'WALK' || STATE.mode === 'BOAT' || STATE.mode === 'SWIMMING') {
+                STATE.lastVehicleMode = STATE.mode;
+                STATE.mode = 'FISHING_WAIT';
+
+                const forward = new THREE.Vector3(0, 0, 6.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
+                STATE.bobberPos.copy(player.position).add(forward);
+                STATE.bobberPos.y = 0.05;
+
+                bobberMesh.position.copy(STATE.bobberPos);
+                bobberMesh.visible = true;
+                lineMesh.visible = true;
+
+                addWaterRipple(STATE.bobberPos);
+
+                sound.playSplash();
+                showToast("Line cast! Waiting for a bite...");
+
+                setTimeout(() => {
+                    if (STATE.mode === 'FISHING_WAIT') {
+                        sound.playSplash();
+                        addWaterRipple(STATE.bobberPos);
+                        showToast("🚨 FISH ON! Reel it in!");
+                        startMinigame();
+                    }
+                }, 2500 + Math.random() * 2500);
+            }
+        }
+
+        function addWaterRipple(pos) {
+            const ripGeo = new THREE.RingGeometry(0.01, 0.45, 18);
+            ripGeo.rotateX(-Math.PI / 2);
+            const ripMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
+            const rip = new THREE.Mesh(ripGeo, ripMat);
+            rip.position.copy(pos);
+            rip.position.y = 0.08;
+            scene.add(rip);
+            waterRipples.push({ mesh: rip, scale: 0.6, opacity: 0.65 });
+        }
+
+        function startMinigame() {
+            STATE.mode = 'FISHING_MINIGAME';
+
+            const regionalFish = FISH_SPECIES.filter(f => f.regions.includes(STATE.currentIsland));
+            STATE.targetFish = regionalFish.length > 0 ? regionalFish[Math.floor(Math.random() * regionalFish.length)] : FISH_SPECIES[0];
+
+            STATE.reelProgress = 35;
+            STATE.fishTargetPos = 50;
+            STATE.tension = 0;
+            STATE.minigameTimer = 0;
+
+            document.getElementById('minigame-box').classList.remove('hidden');
+            document.getElementById('btn-reel').classList.remove('hidden');
+        }
+
+        function updateMinigame(delta) {
+            if (STATE.mode !== 'FISHING_MINIGAME') return;
+
+            STATE.minigameTimer += delta;
+
+            STATE.fishTargetPos += (Math.random() - 0.5) * (50 + STATE.targetFish.difficulty * 15) * delta;
+            STATE.fishTargetPos = THREE.MathUtils.clamp(STATE.fishTargetPos, 15, 85);
+
+            const rodGear = ROD_GEAR.find(r => r.id === STATE.equippedRod);
+
+            if (STATE.isReeling) {
+                STATE.tension += 45 * delta;
+            } else {
+                STATE.tension -= 35 * delta;
+            }
+            STATE.tension = THREE.MathUtils.clamp(STATE.tension, 0, 100);
+
+            const catchZoneRadius = 22 + (rodGear ? rodGear.zoneBonus : 0);
+            const diff = Math.abs(STATE.tension - STATE.fishTargetPos);
+
+            if (diff < catchZoneRadius) {
+                STATE.reelProgress += (28 * (rodGear ? rodGear.power : 1.0)) * delta;
+            } else {
+                STATE.reelProgress -= 18 * delta;
+            }
+
+            document.getElementById('target-zone').style.top = `${100 - STATE.fishTargetPos - (catchZoneRadius / 2)}%`;
+            document.getElementById('target-zone').style.height = `${catchZoneRadius}%`;
+            document.getElementById('reel-indicator').style.top = `${100 - STATE.tension - 4}%`;
+            document.getElementById('reel-progress').style.width = `${STATE.reelProgress}%`;
+
+            if (STATE.reelProgress >= 100) endMinigame(true);
+            else if (STATE.reelProgress <= 0 && STATE.minigameTimer > 2.0) endMinigame(false);
+        }
+
+        function endMinigame(success) {
+            document.getElementById('minigame-box').classList.add('hidden');
+            document.getElementById('btn-reel').classList.add('hidden');
+            bobberMesh.visible = false;
+            lineMesh.visible = false;
+
+            if (success) {
+                sound.playSplash();
+                const fish = STATE.targetFish;
+                const weight = (fish.weightRange[0] + Math.random() * (fish.weightRange[1] - fish.weightRange[0])).toFixed(1);
+
+                STATE.derbyScore += fish.points;
+                STATE.fishBucket.push({ ...fish, weight });
+                STATE.journal[fish.name] = (STATE.journal[fish.name] || 0) + 1;
+
+                document.getElementById('score-text').innerText = `${STATE.derbyScore} pts`;
+                document.getElementById('caught-emoji').innerText = fish.emoji;
+                document.getElementById('caught-title').innerText = fish.name;
+                document.getElementById('caught-weight').innerText = `Weight: ${weight} lbs • Worth +${fish.value}G`;
+                document.getElementById('caught-flavor').innerText = fish.flavor;
+
+                document.getElementById('catch-modal').classList.remove('hidden');
+            } else {
+                sound.playSplash();
+                showToast("❌ SNAP! The line broke!");
+            }
+
+            STATE.mode = STATE.lastVehicleMode;
+        }
+
+        function triggerInteract() {
+            sound.init();
+
+            if (STATE.mode === 'DIALOGUE') {
+                document.getElementById('dialogue-box').classList.add('hidden');
+                STATE.mode = STATE.lastVehicleMode || 'WALK';
+                return;
+            }
+
+            let closestNPC = null;
+            let minDist = Infinity;
+
+            npcEntities.forEach(npc => {
+                const dist = player.position.distanceTo(npc.worldPos);
+                if (dist < 4.5 && dist < minDist) {
+                    minDist = dist;
+                    closestNPC = npc;
+                }
+            });
+
+            if (closestNPC) {
+                STATE.activeNPC = closestNPC;
+                sound.playAnimalese(closestNPC.type);
+
+                const avatarMap = { frog: '🐸', dog: '🐶', duck: '🦆', badger: '🦡', owl: '🦉', squirrel: '🐿️', cat: '🐱', fox: '🦊' };
+                document.getElementById('npc-avatar').innerText = avatarMap[closestNPC.type] || '🐱';
+                document.getElementById('npc-name').innerText = closestNPC.name;
+                document.getElementById('npc-text').innerText = closestNPC.text;
+
+                const shopBtn = document.getElementById('btn-dialogue-shop');
+                if (closestNPC.hasShop) shopBtn.classList.remove('hidden');
+                else shopBtn.classList.add('hidden');
+
+                document.getElementById('dialogue-box').classList.remove('hidden');
+                STATE.lastVehicleMode = (STATE.mode === 'DIALOGUE') ? 'WALK' : STATE.mode;
+                STATE.mode = 'DIALOGUE';
+                return;
+            }
+
+            if (STATE.mode === 'WALK' || STATE.mode === 'SWIMMING') {
+                const distToBoat = player.position.distanceTo(boat.position);
+                if (distToBoat < 5.5) {
+                    STATE.lastVehicleMode = 'BOAT';
+                    STATE.mode = 'BOAT';
+                    STATE.isSwimming = false;
+                    showToast("Boarded motorboat! Driving upriver to Echo Falls!");
+                }
+            } else if (STATE.mode === 'BOAT') {
+                STATE.lastVehicleMode = 'WALK';
+                STATE.mode = 'WALK';
+                player.position.copy(boat.position).add(new THREE.Vector3(1.8, 0.4, 0));
+                showToast("Disembarked boat onto land!");
+            }
+        }
+
+        function openPhotoMode() {
+            closeToolsHub();
+            document.getElementById('photo-overlay').classList.remove('hidden');
+            STATE.mode = 'PHOTO';
+        }
+
+        function closePhotoMode() {
+            document.getElementById('photo-overlay').classList.add('hidden');
+            STATE.mode = STATE.lastVehicleMode || 'WALK';
+        }
+
+        function snapPolaroidPhoto() {
+            sound.playCameraShutter();
+            
+            const flash = document.getElementById('camera-flash');
+            flash.style.opacity = '1';
+            setTimeout(() => flash.style.opacity = '0', 150);
+
+            try {
+                renderer.render(scene, camera);
+                const dataUrl = renderer.domElement.toDataURL('image/jpeg', 0.6);
+                STATE.photoGallery.push({
+                    url: dataUrl,
+                    location: STATE.currentIsland,
+                    date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                });
+                showToast("📸 Captured Polaroid Photo!");
+            } catch(e){}
+        }
+
+        function openCustomizerModal() {
+            closeToolsHub();
+            document.getElementById('custom-modal').classList.remove('hidden');
+            STATE.mode = 'CUSTOM';
+        }
+
+        function openJournalModal() {
+            closeToolsHub();
+            const list = document.getElementById('journal-fish-content');
+            list.innerHTML = FISH_SPECIES.map(f => `
+                <div class="glass-panel p-3 rounded-2xl flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl">${f.emoji}</span>
+                        <div>
+                            <div class="font-bold text-amber-200 text-xs sm:text-sm">${f.name}</div>
+                            <div class="text-[10px] text-amber-300/70">${f.flavor}</div>
+                        </div>
+                    </div>
+                    <div class="text-right font-black text-amber-400 text-xs">
+                        Caught: ${STATE.journal[f.name] || 0}
+                    </div>
+                </div>
+            `).join('');
+            switchJournalTab('fish');
+            document.getElementById('journal-modal').classList.remove('hidden');
+        }
+
+        function openToolsHub() {
+            sound.init();
+            document.getElementById('tools-modal').classList.remove('hidden');
+        }
+
+        function closeToolsHub() {
+            document.getElementById('tools-modal').classList.add('hidden');
+        }
+
+        function openShopUI() {
+            document.getElementById('dialogue-box').classList.add('hidden');
+            document.getElementById('shop-modal').classList.remove('hidden');
+            STATE.mode = 'SHOP';
+            renderShopCatalog();
+        }
+
+        function renderShopCatalog() {
+            document.getElementById('shop-bucket-text').innerText = `${STATE.fishBucket.length} fish in bucket ready to sell`;
+            const list = document.getElementById('shop-items-list');
+
+            let html = `<div class="font-bold text-xs text-amber-300 uppercase tracking-wider mb-1">Fishing Rods</div>`;
+            ROD_GEAR.forEach(rod => {
+                const isEquipped = STATE.equippedRod === rod.id;
+                html += `
+                    <div class="glass-panel p-3 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <div class="font-bold text-amber-200 text-xs sm:text-sm">${rod.name} ${isEquipped ? '🟢 (Equipped)' : ''}</div>
+                            <div class="text-[10px] text-amber-300/80">${rod.desc}</div>
+                        </div>
+                        <div>
+                            ${isEquipped ? '<span class="text-xs text-emerald-400 font-bold">Active</span>' : `
+                                <button onclick="buyRod('${rod.id}')" class="bg-amber-500 hover:bg-amber-400 text-amber-950 font-black text-xs px-3 py-1.5 rounded-xl btn-bouncy">
+                                    ${rod.cost}G
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        }
+
+        window.buyRod = function(rodId) {
+            const rod = ROD_GEAR.find(r => r.id === rodId);
+            if (STATE.coins >= rod.cost) {
+                STATE.coins -= rod.cost;
+                STATE.equippedRod = rodId;
+                document.getElementById('coins-text').innerText = `${STATE.coins}G`;
+                showToast(`Bought & Equipped ${rod.name}!`);
+                renderShopCatalog();
+            } else {
+                showToast("❌ Not enough coins!");
+            }
+        };
+
+        window.switchJournalTab = function(tab) {
+            const fishGuide = document.getElementById('journal-fish-content');
+            const photoAlbum = document.getElementById('journal-photo-content');
+            const tabFishBtn = document.getElementById('tab-fish-guide');
+            const tabPhotoBtn = document.getElementById('tab-photo-album');
+
+            if (tab === 'fish') {
+                fishGuide.classList.remove('hidden');
+                photoAlbum.classList.add('hidden');
+                tabFishBtn.className = "font-black text-xs px-3 py-1.5 rounded-xl bg-amber-500 text-amber-950 btn-bouncy";
+                tabPhotoBtn.className = "font-black text-xs px-3 py-1.5 rounded-xl bg-amber-950/80 text-amber-300 btn-bouncy";
+            } else {
+                fishGuide.classList.add('hidden');
+                photoAlbum.classList.remove('hidden');
+                tabFishBtn.className = "font-black text-xs px-3 py-1.5 rounded-xl bg-amber-950/80 text-amber-300 btn-bouncy";
+                tabPhotoBtn.className = "font-black text-xs px-3 py-1.5 rounded-xl bg-amber-500 text-amber-950 btn-bouncy";
+
+                const grid = document.getElementById('photo-gallery-grid');
+                if (STATE.photoGallery.length === 0) {
+                    grid.innerHTML = `<div class="col-span-2 text-center text-xs text-amber-300/70 py-6">No snapshots taken yet! Use the 📷 camera button to take polaroids.</div>`;
+                } else {
+                    grid.innerHTML = STATE.photoGallery.map(p => `
+                        <div class="glass-panel p-2 rounded-2xl flex flex-col items-center">
+                            <img src="${p.url}" class="w-full aspect-4/3 object-cover rounded-xl border border-white/20">
+                            <div class="text-[10px] font-bold text-amber-200 mt-1">${p.location}</div>
+                            <div class="text-[9px] text-amber-300/60">${p.date}</div>
+                        </div>
+                    `).join('');
+                }
+            }
+        };
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2500);
+        }
+
+        document.getElementById('btn-start-game').addEventListener('click', startGameFromTitle);
+        document.getElementById('btn-tools-hub').addEventListener('click', openToolsHub);
+        document.getElementById('btn-tools-close').addEventListener('click', closeToolsHub);
+
+        document.getElementById('btn-interact').addEventListener('click', triggerInteract);
+        document.getElementById('btn-dig').addEventListener('click', triggerDig);
+        document.getElementById('btn-cast').addEventListener('click', triggerCast);
+
+        const reelBtn = document.getElementById('btn-reel');
+        reelBtn.addEventListener('mousedown', () => STATE.isReeling = true);
+        reelBtn.addEventListener('mouseup', () => STATE.isReeling = false);
+        reelBtn.addEventListener('touchstart', (e) => { e.preventDefault(); STATE.isReeling = true; });
+        reelBtn.addEventListener('touchend', () => STATE.isReeling = false);
+
+        document.getElementById('btn-dialogue-close').addEventListener('click', () => {
+            document.getElementById('dialogue-box').classList.add('hidden');
+            STATE.mode = STATE.lastVehicleMode || 'WALK';
+        });
+
+        document.getElementById('btn-dialogue-shop').addEventListener('click', openShopUI);
+
+        document.getElementById('btn-shop-close').addEventListener('click', () => {
+            document.getElementById('shop-modal').classList.add('hidden');
+            STATE.mode = 'WALK';
+        });
+
+        document.getElementById('btn-take-photo').addEventListener('click', snapPolaroidPhoto);
+        document.getElementById('btn-close-photo').addEventListener('click', closePhotoMode);
+
+        document.getElementById('btn-custom-close').addEventListener('click', () => {
+            document.getElementById('custom-modal').classList.add('hidden');
+            STATE.mode = 'WALK';
+        });
+
+        document.getElementById('btn-sell-fish').addEventListener('click', () => {
+            let earnings = 0;
+            STATE.fishBucket.forEach(f => earnings += f.value);
+            STATE.coins += earnings;
+            STATE.fishBucket = [];
+
+            document.getElementById('coins-text').innerText = `${STATE.coins}G`;
+            showToast(`Sold fish for +${earnings}G!`);
+            renderShopCatalog();
+        });
+
+        document.getElementById('btn-catch-dismiss').addEventListener('click', () => {
+            document.getElementById('catch-modal').classList.add('hidden');
+        });
+
+        document.getElementById('btn-journal-close').addEventListener('click', () => {
+            document.getElementById('journal-modal').classList.add('hidden');
+        });
+
+        document.getElementById('btn-toggle-fs').addEventListener('click', () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        });
+
+        document.getElementById('btn-toggle-sound').addEventListener('click', () => {
+            sound.init();
+            sound.enabled = !sound.enabled;
+            showToast(sound.enabled ? "Sound Unmuted 🎵" : "Sound Muted 🔇");
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = Math.min(clock.getDelta(), 0.1);
+            const time = clock.getElapsedTime();
+
+            const shadowTargetPos = STATE.mode === 'BOAT' ? boat.position : player.position;
+            sunLight.position.set(shadowTargetPos.x + 70, 90, shadowTargetPos.z + 50);
+            sunLight.target.position.copy(shadowTargetPos);
+            sunLight.target.updateMatrixWorld();
+
+            updateLightingCycle(delta);
+            updateFloraAndLeafPiles(delta);
+            updatePlayerMovement(delta);
+            updateCamera(delta);
+            updateMinigame(delta);
+            sound.updateAudioForState(STATE.mode, STATE.boatSpeed);
+
+            birdSoundTimer += delta;
+            if (birdSoundTimer > 4.5 + Math.random() * 3.5) {
+                sound.playBirdChirp();
+                birdSoundTimer = 0;
+            }
+
+            if (boatBeaconMesh) {
+                const distToBoat = player.position.distanceTo(boat.position);
+                if (STATE.mode === 'BOAT' || STATE.mode === 'TITLE' || distToBoat < 12.0) {
+                    boatBeaconMesh.visible = false;
+                } else {
+                    boatBeaconMesh.visible = true;
+                    boatBeaconMesh.rotation.y += delta * 1.5;
+                    const opacityTarget = THREE.MathUtils.clamp((distToBoat - 12.0) / 38.0, 0, 0.45);
+                    boatBeaconMesh.material.opacity = opacityTarget;
+                    const pulse = 1.0 + Math.sin(time * 3.0) * 0.15;
+                    boatBeaconMesh.scale.set(pulse, 1, pulse);
+                }
+            }
+
+            digSpotEntities.forEach(ds => {
+                if (ds.glint && !ds.dug) {
+                    const scale = 0.8 + Math.sin(time * 6.0) * 0.3;
+                    ds.glint.scale.set(scale, scale, scale);
+                    ds.glint.rotation.y += delta * 2.0;
+                }
+            });
+
+            if (waterMesh) {
+                const pos = waterMesh.geometry.attributes.position;
+                const count = pos.count;
+                for (let i = 0; i < count; i++) {
+                    const x = pos.getX(i);
+                    const z = pos.getZ(i);
+                    const wave1 = Math.sin(x * 0.07 + time * 2.4) * 0.38;
+                    const wave2 = Math.cos(z * 0.08 + time * 2.0) * 0.35;
+                    const wave3 = Math.sin((x * 0.5 + z) * 0.06 + time * 3.2) * 0.22;
+                    pos.setY(i, wave1 + wave2 + wave3);
+                }
+                pos.needsUpdate = true;
+            }
+
+            for (let i = waterRipples.length - 1; i >= 0; i--) {
+                const r = waterRipples[i];
+                r.scale += delta * 3.0;
+                r.opacity -= delta * 0.8;
+                r.mesh.scale.set(r.scale, r.scale, r.scale);
+                r.mesh.material.opacity = Math.max(0, r.opacity);
+                if (r.opacity <= 0) {
+                    scene.remove(r.mesh);
+                    waterRipples.splice(i, 1);
+                }
+            }
+
+            foamRings.forEach(f => {
+                const cycle = (time * 1.8 + f.phase + f.offset) % (Math.PI * 2);
+                const scale = 1.0 + Math.sin(cycle) * 0.08;
+                f.mesh.scale.set(scale, 1, scale);
+                f.mesh.material.opacity = 0.2 + (1.0 - Math.sin(cycle)) * 0.45;
+            });
+
+            const tempChimneyPos = new THREE.Vector3();
+            chimneyEmitMeshes.forEach(chMesh => {
+                if (Math.random() < 0.12) {
+                    chMesh.getWorldPosition(tempChimneyPos);
+                    tempChimneyPos.y += 1.1;
+
+                    const smokeP = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.25 + Math.random() * 0.2, 5, 5),
+                        new THREE.MeshBasicMaterial({ color: 0xefefef, transparent: true, opacity: 0.5 })
+                    );
+                    smokeP.position.copy(tempChimneyPos).add(new THREE.Vector3((Math.random() - 0.5) * 0.2, 0, (Math.random() - 0.5) * 0.2));
+                    scene.add(smokeP);
+                    smokeParticles.push({
+                        mesh: smokeP,
+                        vel: new THREE.Vector3((Math.random() - 0.5) * 0.4, 1.2 + Math.random() * 0.8, (Math.random() - 0.5) * 0.4),
+                        life: 1.8
+                    });
+                }
+            });
+
+            for (let i = smokeParticles.length - 1; i >= 0; i--) {
+                const p = smokeParticles[i];
+                if (p.mesh) {
+                    p.life -= delta;
+                    p.mesh.position.addScaledVector(p.vel, delta);
+                    p.mesh.scale.addScalar(delta * 0.8);
+                    p.mesh.material.opacity = Math.max(0, p.life / 1.8 * 0.5);
+                    if (p.life <= 0) {
+                        scene.remove(p.mesh);
+                        smokeParticles.splice(i, 1);
+                    }
+                }
+            }
+
+            for (let i = dirtParticles.length - 1; i >= 0; i--) {
+                const dp = dirtParticles[i];
+                dp.life -= delta;
+                dp.vel.y -= 9.8 * delta;
+                dp.mesh.position.addScaledVector(dp.vel, delta);
+                if (dp.life <= 0) {
+                    scene.remove(dp.mesh);
+                    dirtParticles.splice(i, 1);
+                }
+            }
+
+            if (lineMesh.visible) {
+                const rodTipPos = player.position.clone().add(new THREE.Vector3(0.5, 1.2, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y));
+                lineMesh.geometry.setFromPoints([rodTipPos, bobberMesh.position]);
+            }
+
+            fireflyGroup.forEach(fly => {
+                if (fly.group.visible) {
+                    fly.group.position.y = fly.basePosY + Math.sin(time * 2.5 + fly.phase) * 0.22;
+                    fly.group.position.x += Math.cos(time * 1.5 + fly.phase) * 0.008;
+                    const pulse = 1.0 + Math.sin(time * 4.0 + fly.phase) * 0.25;
+                    fly.group.scale.set(pulse, pulse, pulse);
+                }
+            });
+
+            if (leafParticles) {
+                const pos = leafParticles.geometry.attributes.position.array;
+                for (let i = 1; i < pos.length; i += 3) {
+                    pos[i] -= delta * 1.8;
+                    if (pos[i] < 0) pos[i] = 16;
+                }
+                leafParticles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            windGustGroup.forEach(item => {
+                item.line.position.x += item.speed * delta;
+                if (item.line.position.x > 140) item.line.position.x = -140;
+
+                const pos = item.line.geometry.attributes.position;
+                for (let j = 0; j < pos.count; j++) {
+                    const x = pos.getX(j);
+                    const waveY = Math.sin(time * 4.0 + x * 0.6 + item.phase) * 0.35;
+                    const waveZ = Math.cos(time * 3.0 + x * 0.4 + item.phase) * 0.25;
+                    pos.setY(j, waveY);
+                    pos.setZ(j, waveZ);
+                }
+                pos.needsUpdate = true;
+            });
+
+            skyClouds.forEach(cloud => {
+                cloud.group.position.x += cloud.speed * delta;
+                if (cloud.group.position.x > 280) cloud.group.position.x = -280;
+            });
+
+            crabEntities.forEach(crab => {
+                crab.timer -= delta;
+                if (crab.timer <= 0) {
+                    const ang = Math.random() * Math.PI * 2;
+                    const scuttleDist = 0.8 + Math.random() * 1.2;
+                    const newX = crab.mesh.position.x + Math.cos(ang) * scuttleDist;
+                    const newZ = crab.mesh.position.z + Math.sin(ang) * scuttleDist;
+
+                    const distFromIsl = Math.hypot(newX - crab.island.pos.x, newZ - crab.island.pos.z);
+                    if (distFromIsl < crab.island.radius - 0.5) {
+                        crab.targetPos.set(newX, crab.island.height + 0.15, newZ);
+                    }
+                    crab.timer = 2.5 + Math.random() * 3.5;
+                }
+                crab.mesh.position.lerp(crab.targetPos, delta * 4.0);
+            });
+
+            birdEntities.forEach(bird => {
+                bird.ang += delta * (bird.speed / bird.radius);
+                const nextX = bird.center.x + Math.cos(bird.ang) * bird.radius;
+                const nextZ = bird.center.z + Math.sin(bird.ang) * bird.radius;
+
+                bird.group.position.set(nextX, bird.height, nextZ);
+
+                const tangentX = -Math.sin(bird.ang);
+                const tangentZ = Math.cos(bird.ang);
+                const lookTarget = bird.group.position.clone().add(new THREE.Vector3(tangentX, 0, tangentZ));
+                bird.group.lookAt(lookTarget);
+
+                const flap = Math.sin(time * 12) * 0.45;
+                bird.wingL.rotation.z = flap;
+                bird.wingR.rotation.z = -flap;
+            });
+
+            underwaterFish.forEach(fish => {
+                fish.leapTimer -= delta;
+                if (fish.leapTimer <= 0 && !fish.isLeaping) {
+                    fish.isLeaping = true;
+                    fish.leapTimer = 1.2;
+                    addWaterRipple(fish.group.position);
+                    const distToPlayer = player.position.distanceTo(fish.group.position);
+                    sound.playSplash(distToPlayer);
+                }
+
+                if (fish.isLeaping) {
+                    fish.leapTimer -= delta;
+                    const leapProgress = (1.2 - fish.leapTimer) / 1.2;
+                    fish.group.position.y = -0.45 + Math.sin(leapProgress * Math.PI) * 2.2;
+                    if (fish.leapTimer <= 0) {
+                        fish.isLeaping = false;
+                        fish.group.position.y = -0.45;
+                        fish.leapTimer = 15.0 + Math.random() * 25.0;
+                        addWaterRipple(fish.group.position);
+                    }
+                } else {
+                    const distFromHome = fish.group.position.distanceTo(fish.homePos);
+
+                    if (distFromHome > fish.maxRadius) {
+                        const homeAngle = Math.atan2(fish.homePos.x - fish.group.position.x, fish.homePos.z - fish.group.position.z);
+                        let diff = homeAngle - fish.angle;
+                        while (diff < -Math.PI) diff += Math.PI * 2;
+                        while (diff > Math.PI) diff -= Math.PI * 2;
+                        fish.angle += diff * delta * 2.0;
+                    } else {
+                        fish.turnTimer -= delta;
+                        if (fish.turnTimer <= 0) {
+                            fish.angle += (Math.random() - 0.5) * (1.8 / (fish.difficulty || 1));
+                            fish.turnTimer = 2.5 + Math.random() * 3.5;
+                        }
+                    }
+
+                    fish.group.position.x += Math.sin(fish.angle) * fish.speed * delta;
+                    fish.group.position.z += Math.cos(fish.angle) * fish.speed * delta;
+                }
+
+                if (fish.tail) {
+                    fish.tail.rotation.y = Math.sin(time * (9 - fish.difficulty * 0.8)) * 0.45;
+                }
+
+                fish.group.rotation.y = fish.angle;
+            });
+
+            try {
+                if (renderTarget && postMaterial) {
+                    renderer.setRenderTarget(renderTarget);
+                    renderer.render(scene, camera);
+
+                    renderer.setRenderTarget(null);
+                    postMaterial.uniforms.tDiffuse.value = renderTarget.texture;
+                    renderer.render(postScene, postCamera);
+                } else {
+                    renderer.render(scene, camera);
+                }
+            } catch(e) {
+                renderer.setRenderTarget(null);
+                renderer.render(scene, camera);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const scale = 0.82;
+            const renderW = Math.floor(w * scale);
+            const renderH = Math.floor(h * scale);
+
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(w, h);
+
+            if (renderTarget) {
+                renderTarget.setSize(renderW, renderH);
+                postMaterial.uniforms.uResolution.value.set(renderW, renderH);
+            }
+        });
+
+        window.onload = function() {
+            initScene();
+            animate();
+            const canvas = document.getElementById('game-canvas');
+            if (canvas) canvas.focus();
+        };
+    </script>
+</body>
+</html>
